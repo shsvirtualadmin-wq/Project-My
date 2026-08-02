@@ -230,7 +230,9 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
     setError(null);
 
     try {
-      const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+      const redirectUrl = typeof window !== 'undefined' && window.location.origin.includes('scholario.pages.dev')
+        ? 'https://scholario.pages.dev/reset-password'
+        : `${window.location.origin}/reset-password`;
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(trimmedEmail, {
         redirectTo: redirectUrl,
       });

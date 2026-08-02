@@ -47,6 +47,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { PaymentRequiredScreen } from './components/PaymentRequiredScreen';
 import { PaymentProofModal } from './components/PaymentProofModal';
 import { PlanSelectionScreen, PlanId, PLAN_OPTIONS } from './components/PlanSelectionScreen';
+import { ResetPasswordScreen } from './components/ResetPasswordScreen';
 import { supabase, apiFetch, safeJsonResponse, syncUserProfile, saveTestToSupabase, fetchUserTestHistoryFromSupabase, clearUserTestHistoryInSupabase, fetchStudentProfileFromSupabase, fetchStudentMcqUsage, clearProfileCache, checkUserExistsInDatabase, isStudentExistingBeforeRule, isAdminEmail, User, StudentProfile } from './lib/supabase';
 import { App as CapacitorApp } from '@capacitor/app';
 import { ShieldCheck, Sun, Moon, WifiOff, AlertTriangle, Lock, ShieldAlert, GraduationCap, Sparkles, ArrowRight } from 'lucide-react';
@@ -64,7 +65,8 @@ type ScreenType =
   | 'auth'
   | 'test'
   | 'results'
-  | 'admin';
+  | 'admin'
+  | 'reset_password';
 
 export function isTrackAllowedForUser(
   profile: StudentProfile | null,
@@ -113,10 +115,22 @@ const getInitialUrlState = (): {
   if (typeof window === 'undefined') {
     return { screen: 'intro', selectedSubject: 'Urdu' };
   }
+
+  // Check if URL points to reset password path or recovery parameters
+  if (
+    window.location.pathname.includes('/reset-password') ||
+    window.location.search.includes('type=recovery') ||
+    window.location.hash.includes('type=recovery') ||
+    window.location.search.includes('error=') ||
+    window.location.hash.includes('error=')
+  ) {
+    return { screen: 'reset_password', selectedSubject: 'Urdu' };
+  }
+
   const params = new URLSearchParams(window.location.search);
   const urlScreen = params.get('screen') as ScreenType | null;
   const validScreens: ScreenType[] = [
-    'intro', 'guided_wizard', 'plan_selection', 'grades_flow', 'group', 'dashboard', 'subject', 'duration', 'auth', 'test', 'results', 'admin'
+    'intro', 'guided_wizard', 'plan_selection', 'grades_flow', 'group', 'dashboard', 'subject', 'duration', 'auth', 'test', 'results', 'admin', 'reset_password'
   ];
 
   let initialScreen: ScreenType = 'intro';
@@ -150,6 +164,9 @@ const buildUrl = (
   grp?: string,
   sub?: string
 ) => {
+  if (scr === 'reset_password') {
+    return '/reset-password';
+  }
   const params = new URLSearchParams();
   if (scr !== 'intro') {
     params.set('screen', scr);
@@ -531,14 +548,14 @@ export function App() {
     }
   }, [currentUser, isAdmin, userProfile, isRegisteredStudent, selectedClass, selectedGroup, screen]);
 
-  // Clean OAuth URL parameters immediately from browser history on mount
+  // Clean OAuth URL parameters immediately from browser history on mount (except when resetting password)
   useEffect(() => {
     const hasHashToken = window.location.hash.includes('access_token') || window.location.hash.includes('type=recovery');
     const hasSearchCode = window.location.search.includes('code=');
-    if (hasHashToken || hasSearchCode) {
+    if ((hasHashToken || hasSearchCode) && screen !== 'reset_password' && !window.location.pathname.includes('/reset-password')) {
       window.history.replaceState(null, '', window.location.pathname);
     }
-  }, []);
+  }, [screen]);
 
   // Synchronize internal state with Browser History API and URL query parameters
   useEffect(() => {
@@ -733,7 +750,7 @@ export function App() {
       const hasSearchCode = window.location.search.includes('code=');
       const isPendingOAuth = localStorage.getItem('shs_oauth_redirect') === 'true' || sessionStorage.getItem('shs_oauth_redirect') === 'true';
 
-      if (hasHashToken || hasSearchCode || isPendingOAuth) {
+      if ((hasHashToken || hasSearchCode || isPendingOAuth) && screen !== 'reset_password' && !window.location.pathname.includes('/reset-password')) {
         localStorage.removeItem('shs_oauth_redirect');
         sessionStorage.removeItem('shs_oauth_redirect');
         if (window.location.hash || window.location.search) {
@@ -1734,6 +1751,17 @@ export function App() {
                       </p>
                     </div>
                   )
+                )}
+                {screen === 'reset_password' && (
+                  <ResetPasswordScreen
+                    onNavigateToLogin={() => {
+                      if (window.location.hash || window.location.search || window.location.pathname.includes('/reset-password')) {
+                        window.history.replaceState(null, '', '/');
+                      }
+                      setShowLmsModal(true);
+                      setScreen('intro');
+                    }}
+                  />
                 )}
               </>
             )}
