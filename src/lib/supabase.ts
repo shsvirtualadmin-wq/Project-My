@@ -1852,71 +1852,12 @@ export async function submitPaymentProofApi(formData: FormData): Promise<{ succe
       return { success: true, data: result.data };
     }
 
-    console.warn('/api/payment-requests/submit failed or returned non-ok:', resp.status, result);
-
-    // Fallback directly to Supabase client if configured
-    if (isSupabaseConfigured) {
-      const studentId = formData.get('student_id')?.toString() || '';
-      const studentName = formData.get('student_name')?.toString() || 'Student';
-      const studentEmail = formData.get('student_email')?.toString() || '';
-      const paymentMethod = formData.get('payment_method')?.toString() || '';
-      const amount = formData.get('amount')?.toString() || '';
-      const transactionRef = formData.get('transaction_reference')?.toString() || '';
-      const courseTier = formData.get('course_tier')?.toString() || '';
-      const file = formData.get('file') as File | null;
-
-      let fileUrl = 'https://drive.google.com';
-      if (file && file.size < 500 * 1024) {
-        try {
-          fileUrl = await new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (e) => resolve((e.target?.result as string) || 'https://drive.google.com');
-            reader.onerror = () => resolve('https://drive.google.com');
-            reader.readAsDataURL(file);
-          });
-        } catch {}
-      }
-
-      const newRecord: any = {
-        student_id: studentId,
-        student_name: studentName,
-        student_email: studentEmail,
-        payment_method: paymentMethod,
-        amount: Number(amount) || amount,
-        drive_file_id: `client-${Date.now()}`,
-        drive_file_url: fileUrl,
-        transaction_reference: transactionRef,
-        status: 'pending',
-        created_at: new Date().toISOString(),
-      };
-
-      if (courseTier) {
-        newRecord.admin_note = `Selected Tier: ${courseTier}`;
-      }
-
-      const { data: inserted, error: sbErr } = await supabase
-        .from('payment_requests')
-        .insert(newRecord)
-        .select('*')
-        .maybeSingle();
-
-      if (!sbErr) {
-        try {
-          await supabase
-            .from('students')
-            .update({ payment_status: 'Pending Verification', requires_payment: true, updated_at: new Date().toISOString() })
-            .or(`id.eq.${studentId},email.eq.${studentEmail}`);
-        } catch {}
-        return { success: true, data: inserted || newRecord };
-      } else {
-        console.error('Supabase direct insert payment_requests error:', sbErr);
-      }
-    }
-
-    return { success: false, error: result?.error || result?.message || (resp.status ? `Request failed with status ${resp.status}` : 'Failed to submit payment proof.') };
+    const errorMessage = result?.error || result?.message || `Payment submission server error (Status ${resp.status})`;
+    console.error('/api/payment-requests/submit failed:', resp.status, result);
+    return { success: false, error: errorMessage };
   } catch (err: any) {
     console.error('Error submitting payment proof:', err);
-    return { success: false, error: err?.message || 'Network error submitting payment proof.' };
+    return { success: false, error: err?.message || 'Network connection error while submitting payment proof.' };
   }
 }
 

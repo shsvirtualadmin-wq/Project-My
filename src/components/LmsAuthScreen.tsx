@@ -196,6 +196,13 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
       if (authErr) throw authErr;
 
       if (data.user) {
+        // Send welcome email to student
+        fetch('/api/send-welcome-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: trimmedName, email: trimmedEmail }),
+        }).catch((e) => console.warn('Welcome email error:', e));
+
         if (data.session) {
           // Direct login without verification requirement
           onSuccess();

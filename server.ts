@@ -3493,6 +3493,108 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     `;
   }
 
+  function generateAdminPaymentNotificationEmail({ name, email, method, amount, date, transactionRef, driveUrl }: { name: string; email: string; method: string; amount: string | number; date: string; transactionRef?: string; driveUrl?: string }) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+          .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #cbd5e1; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+          .header { background: #0f172a; color: #f59e0b; padding: 24px; text-align: center; }
+          .header h1 { margin: 0; font-size: 20px; font-weight: 800; }
+          .body { padding: 24px; }
+          .card { background: #f8fafc; border-radius: 12px; padding: 16px; margin: 16px 0; border: 1px solid #e2e8f0; }
+          .row { margin-bottom: 8px; font-size: 13px; }
+          .label { font-weight: 700; color: #475569; }
+          .value { color: #0f172a; }
+          .btn { display: inline-block; background: #059669; color: #ffffff !important; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; margin-top: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Boardly Admin Alert</h1>
+            <p style="margin: 4px 0 0; color: #cbd5e1; font-size: 13px;">New Payment Verification Proof Submitted</p>
+          </div>
+          <div class="body">
+            <h2 style="font-size: 16px; margin-top: 0; color: #0f172a;">New Student Payment Proof</h2>
+            <div class="card">
+              <div class="row"><span class="label">Student Name:</span> <span class="value">${name}</span></div>
+              <div class="row"><span class="label">Student Email:</span> <span class="value">${email}</span></div>
+              <div class="row"><span class="label">Payment Method:</span> <span class="value">${method}</span></div>
+              <div class="row"><span class="label">Amount Paid:</span> <span class="value">PKR ${amount}</span></div>
+              <div class="row"><span class="label">Transaction Ref:</span> <span class="value">${transactionRef || 'N/A'}</span></div>
+              <div class="row"><span class="label">Submitted At:</span> <span class="value">${date}</span></div>
+            </div>
+            ${driveUrl ? `<a href="${driveUrl}" class="btn" target="_blank">View Screenshot on Google Drive</a>` : ''}
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  function generateWelcomeEmail({ name, email }: { name: string; email: string }) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
+          .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; }
+          .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; padding: 28px 24px; text-align: center; }
+          .header h1 { margin: 0; font-size: 22px; font-weight: 800; color: #f59e0b; }
+          .body { padding: 28px 24px; }
+          .footer { text-align: center; font-size: 12px; color: #94a3b8; padding: 16px 24px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Welcome to Boardly!</h1>
+            <p style="margin: 4px 0 0; color: #cbd5e1; font-size: 13px;">Pakistan's Premier Exam Prep Platform</p>
+          </div>
+          <div class="body">
+            <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 0;">Welcome aboard, ${name}!</h2>
+            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
+              Thank you for signing up for Boardly (${email}). We are thrilled to accompany you on your exam preparation journey for MDCAT, TCAT, Federal Board, and Provincial Board exams.
+            </p>
+            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
+              You can start taking practice tests, generating custom MCQs, and studying with our AI Study Buddy immediately.
+            </p>
+          </div>
+          <div class="footer">
+            © ${new Date().getFullYear()} Boardly. All rights reserved.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  // API Endpoint: Send Welcome Email
+  app.post("/api/send-welcome-email", async (req: express.Request, res: express.Response) => {
+    try {
+      const { name, email } = req.body || {};
+      if (!email) {
+        return res.status(400).json({ success: false, error: "Student email is required." });
+      }
+      const html = generateWelcomeEmail({ name: name || "Student", email });
+      const sendRes = await sendEmail({
+        to: email,
+        subject: "Welcome to Boardly - Your Exam Prep Journey Begins!",
+        html,
+      });
+      return res.status(200).json({ success: sendRes.success, error: sendRes.error });
+    } catch (err: any) {
+      console.error("[api/send-welcome-email error]:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Error sending welcome email." });
+    }
+  });
+
   // API Endpoint: Submit Payment Proof
   app.post("/api/payment-requests/submit", driveUploadMulter.single("file"), async (req: express.Request, res: express.Response) => {
     try {
@@ -3507,10 +3609,18 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         return res.status(400).json({ success: false, error: "Payment screenshot file is required." });
       }
 
+      const keyRaw = process.env.GOOGLE_SERVICE_ACCOUNT_KEY;
+      if (!keyRaw) {
+        return res.status(400).json({
+          success: false,
+          error: "GOOGLE_SERVICE_ACCOUNT_KEY is missing in server environment variables. Please add your Google Service Account JSON key to environment variables to enable Google Drive screenshot uploads."
+        });
+      }
+
       let driveFileId = "";
       let driveFileUrl = "";
 
-      // Try uploading to Google Drive
+      // Upload to Google Drive
       try {
         const accessToken = await getGoogleAccessToken(process.env);
         const SHARED_FOLDER_ID = getEnvVar("GOOGLE_DRIVE_FOLDER_ID", "1Kb6pb7EKoS5mCWPI8tRPeG1rc3yqpMsv");
@@ -3554,17 +3664,19 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
           driveFileId = uploaded.id;
           driveFileUrl = uploaded.webViewLink || `https://drive.google.com/file/d/${uploaded.id}/view`;
         } else {
-          console.warn("[Drive API Upload Warning]:", await driveRes.text());
+          const errText = await driveRes.text();
+          console.error("[Drive API Upload Error]:", errText);
+          return res.status(500).json({
+            success: false,
+            error: `Google Drive upload failed (${driveRes.status}): ${errText}`
+          });
         }
-      } catch (driveErr) {
-        console.warn("[Drive Upload Failed, continuing with fallback]:", driveErr);
-      }
-
-      // Fallback preview URL if Drive upload didn't produce a link
-      if (!driveFileUrl) {
-        const base64Data = file.buffer ? `data:${file.mimetype || 'image/png'};base64,${file.buffer.toString('base64')}` : '';
-        driveFileUrl = base64Data.length < 500000 ? base64Data : 'https://drive.google.com';
-        driveFileId = `local-${Date.now()}`;
+      } catch (driveErr: any) {
+        console.error("[Drive Upload Exception]:", driveErr);
+        return res.status(500).json({
+          success: false,
+          error: `Google Drive Upload Exception: ${driveErr?.message || driveErr}`
+        });
       }
 
       const supabaseAdmin = getSupabaseAdminClient() || getAuthClient(req);
@@ -3591,6 +3703,10 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
         if (error) {
           console.error("[Supabase Insert Error payment_requests]:", error);
+          return res.status(500).json({
+            success: false,
+            error: `Database save failed: ${error.message}`
+          });
         } else if (data) {
           insertedData = data;
         }
@@ -3610,21 +3726,46 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         }
       }
 
-      // Send Confirmation Email
-      const emailHtml = generateSubmissionConfirmationEmail({
+      // 1) Send Student Confirmation Email
+      const studentEmailHtml = generateSubmissionConfirmationEmail({
         name: newRecord.student_name,
         method: newRecord.payment_method,
         amount: newRecord.amount,
         date: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
       });
 
-      sendEmail({
+      const studentEmailRes = await sendEmail({
         to: newRecord.student_email,
         subject: "Payment Proof Received - Boardly Premium Access",
-        html: emailHtml,
-      }).catch(e => console.error("Error sending confirmation email:", e));
+        html: studentEmailHtml,
+      });
 
-      return res.status(200).json({ success: true, data: insertedData });
+      // 2) Send Admin Notification Email
+      const adminEmailHtml = generateAdminPaymentNotificationEmail({
+        name: newRecord.student_name,
+        email: newRecord.student_email,
+        method: newRecord.payment_method,
+        amount: newRecord.amount,
+        date: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
+        transactionRef: newRecord.transaction_reference,
+        driveUrl: driveFileUrl,
+      });
+
+      const adminEmailRes = await sendEmail({
+        to: "shsvirtualadmin@gmail.com",
+        subject: `[NEW PAYMENT PROOF] ${newRecord.student_name} (${newRecord.student_email})`,
+        html: adminEmailHtml,
+      });
+
+      return res.status(200).json({
+        success: true,
+        data: insertedData,
+        driveFileUrl,
+        emailsSent: {
+          student: studentEmailRes.success,
+          admin: adminEmailRes.success,
+        }
+      });
     } catch (err: any) {
       console.error("[api/payment-requests/submit error]:", err);
       return res.status(500).json({ success: false, error: err?.message || "Internal server error submitting payment proof." });
