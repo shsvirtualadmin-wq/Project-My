@@ -1,4 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="1024" height="1024">
+import sharp from 'sharp';
+import fs from 'fs';
+import path from 'path';
+
+// Create ultra high-res 1024x1024 SVG matching Image 2 perfectly
+const svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="1024" height="1024">
   <defs>
     <!-- Dark Background Gradient -->
     <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
@@ -109,4 +114,58 @@
     <path d="M 385 570 L 400 650 L 415 570 L 400 585 Z" fill="url(#goldBright)" />
 
   </g>
-</svg>
+</svg>`;
+
+async function main() {
+  const scriptsDir = path.dirname(new URL(import.meta.url).pathname);
+  const rootDir = path.resolve(scriptsDir, '..');
+  
+  const publicDir = path.join(rootDir, 'public');
+  const distDir = path.join(rootDir, 'dist');
+  const publicAssetsDir = path.join(publicDir, 'assets');
+  const distAssetsDir = path.join(distDir, 'assets');
+
+  // Ensure directories exist
+  [publicDir, distDir, publicAssetsDir, distAssetsDir].forEach(d => {
+    if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+  });
+
+  // Save SVG
+  fs.writeFileSync(path.join(publicDir, 'logo.svg'), svgContent);
+  fs.writeFileSync(path.join(publicDir, 'boardly-logo.svg'), svgContent);
+  if (fs.existsSync(distDir)) {
+    fs.writeFileSync(path.join(distDir, 'logo.svg'), svgContent);
+    fs.writeFileSync(path.join(distDir, 'boardly-logo.svg'), svgContent);
+  }
+
+  // Generate 1024x1024 high-res PNGs
+  const pngBuffer = await sharp(Buffer.from(svgContent))
+    .resize(1024, 1024)
+    .png({ quality: 100 })
+    .toBuffer();
+
+  // Write PNG files across public & dist locations
+  const pngPaths = [
+    path.join(publicDir, 'logo.png'),
+    path.join(publicDir, 'boardly-logo.png'),
+    path.join(publicAssetsDir, 'logo.png'),
+    path.join(publicAssetsDir, 'boardly-logo.png'),
+    path.join(distDir, 'logo.png'),
+    path.join(distDir, 'boardly-logo.png'),
+    path.join(distAssetsDir, 'logo.png'),
+    path.join(distAssetsDir, 'boardly-logo.png'),
+  ];
+
+  pngPaths.forEach(p => {
+    try {
+      fs.writeFileSync(p, pngBuffer);
+      console.log('Successfully wrote:', p);
+    } catch (e) {
+      console.warn('Failed to write:', p, e);
+    }
+  });
+
+  console.log('Logo generation complete!');
+}
+
+main().catch(console.error);
