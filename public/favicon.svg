@@ -1,0 +1,16 @@
+<svg width="240" height="240" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="favGoldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2B90C" />
+      <stop offset="100%" stop-color="#D4A94A" />
+    </linearGradient>
+    <linearGradient id="favBgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1A1814" />
+      <stop offset="100%" stop-color="#090909" />
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="232" height="232" rx="48" fill="url(#favBgGrad)" stroke="#F2B90C" stroke-width="6" stroke-opacity="0.6" />
+  <rect x="28" y="28" width="184" height="184" rx="36" fill="url(#favGoldGrad)" />
+  <text x="120" y="152" font-family="'Space Grotesk', 'Inter', system-ui, sans-serif" font-size="128" font-weight="900" fill="#0A0A0A" text-anchor="middle">B</text>
+</svg>

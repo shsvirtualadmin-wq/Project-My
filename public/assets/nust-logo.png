@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="nust-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#002B49"/>
+      <stop offset="100%" stop-color="#004B87"/>
+    </linearGradient>
+    <linearGradient id="nust-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F2B90C"/>
+      <stop offset="100%" stop-color="#D49B00"/>
+    </linearGradient>
+  </defs>
+  <path d="M 60,6 C 88,6 102,18 102,46 C 102,80 60,112 60,112 C 60,112 18,80 18,46 C 18,18 32,6 60,6 Z" fill="url(#nust-blue)" stroke="url(#nust-gold)" stroke-width="3"/>
+  <ellipse cx="60" cy="46" rx="24" ry="9" fill="none" stroke="url(#nust-gold)" stroke-width="2" transform="rotate(-35 60 46)"/>
+  <ellipse cx="60" cy="46" rx="24" ry="9" fill="none" stroke="url(#nust-gold)" stroke-width="2" transform="rotate(35 60 46)"/>
+  <ellipse cx="60" cy="46" rx="24" ry="9" fill="none" stroke="#FFFFFF" stroke-width="1.5" transform="rotate(90 60 46)"/>
+  <circle cx="60" cy="46" r="5" fill="#F2B90C"/>
+  <text x="60" y="94" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="13" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">NUST</text>
+  <text x="60" y="104" font-family="sans-serif" font-weight="700" font-size="6.5" fill="#F2B90C" text-anchor="middle" letter-spacing="0.5">NET PREP</text>
+</svg>

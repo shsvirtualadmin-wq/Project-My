@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="uhs-green" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#004D25"/>
+      <stop offset="100%" stop-color="#002612"/>
+    </linearGradient>
+    <linearGradient id="uhs-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFD700"/>
+      <stop offset="100%" stop-color="#C59B27"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Circle -->
+  <circle cx="60" cy="60" r="58" fill="url(#uhs-gold)"/>
+  <circle cx="60" cy="60" r="52" fill="url(#uhs-green)"/>
+  <circle cx="60" cy="60" r="44" fill="none" stroke="url(#uhs-gold)" stroke-width="2"/>
+
+  <!-- Caduceus & Book -->
+  <g transform="translate(60, 50)">
+    <!-- Rod -->
+    <line x1="0" y1="-22" x2="0" y2="20" stroke="url(#uhs-gold)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="0" cy="-24" r="3.5" fill="url(#uhs-gold)"/>
+    
+    <!-- Snake -->
+    <path d="M 0,-16 C 10,-12 10,-4 0,0 C -10,4 -10,12 0,16" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>
+    
+    <!-- Open Book behind base -->
+    <path d="M -20,12 C -10,8 -4,8 0,10 C 4,8 10,8 20,12 L 20,20 C 10,16 4,16 0,18 C -4,16 -10,16 -20,20 Z" fill="url(#uhs-gold)" opacity="0.9"/>
+  </g>
+
+  <!-- Laurel Wreath Leaves -->
+  <path d="M 26,62 C 22,50 28,38 34,32 C 32,44 34,54 40,64 Z" fill="url(#uhs-gold)"/>
+  <path d="M 94,62 C 98,50 92,38 86,32 C 88,44 86,54 80,64 Z" fill="url(#uhs-gold)"/>
+
+  <!-- Bottom Banner -->
+  <rect x="22" y="86" width="76" height="14" rx="4" fill="url(#uhs-gold)"/>
+  <text x="60" y="96" font-family="sans-serif" font-weight="900" font-size="8" fill="#002612" text-anchor="middle" letter-spacing="0.5">UHS LAHORE</text>
+</svg>

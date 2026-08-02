@@ -1,0 +1,16 @@
+{
+  "short_name": "Boardly",
+  "name": "Boardly — SHS Virtual Academy MCQ Portal",
+  "icons": [
+    {
+      "src": "/boardly-logo.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192 512x512"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#000000",
+  "theme_color": "#007AFF",
+  "display": "standalone",
+  "orientation": "portrait"
+}

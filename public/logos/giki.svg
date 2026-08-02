@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="giki-maroon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4A0000"/>
+      <stop offset="100%" stop-color="#280000"/>
+    </linearGradient>
+    <linearGradient id="giki-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFC107"/>
+      <stop offset="100%" stop-color="#FFA000"/>
+    </linearGradient>
+  </defs>
+  <path d="M 60,6 C 88,6 102,18 102,46 C 102,80 60,112 60,112 C 60,112 18,80 18,46 C 18,18 32,6 60,6 Z" fill="url(#giki-maroon)" stroke="url(#giki-gold)" stroke-width="3"/>
+  <!-- Atom Orbits -->
+  <ellipse cx="60" cy="48" rx="22" ry="8" fill="none" stroke="url(#giki-gold)" stroke-width="2" transform="rotate(-30 60 48)"/>
+  <ellipse cx="60" cy="48" rx="22" ry="8" fill="none" stroke="url(#giki-gold)" stroke-width="2" transform="rotate(30 60 48)"/>
+  <circle cx="60" cy="48" r="4" fill="#FFFFFF"/>
+  <text x="60" y="96" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="13" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">GIKI</text>
+</svg>

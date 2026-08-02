@@ -1,0 +1,8 @@
+{
+  "name": "Boardly — MCQ Practice Portal",
+  "description": "Practice-ready multiple choice tests for board exams and top university admission tests — Grades 9 through 12.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

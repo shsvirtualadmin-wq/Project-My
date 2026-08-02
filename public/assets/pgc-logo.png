@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="pgc-maroon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#58111A"/>
+      <stop offset="100%" stop-color="#3D0B12"/>
+    </linearGradient>
+    <linearGradient id="pgc-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E0A96D"/>
+      <stop offset="100%" stop-color="#C5853B"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Punjab Maroon Shield -->
+  <path d="M 60,6 C 88,6 102,18 102,46 C 102,80 60,112 60,112 C 60,112 18,80 18,46 C 18,18 32,6 60,6 Z" fill="url(#pgc-maroon)" stroke="url(#pgc-gold)" stroke-width="3"/>
+
+  <!-- Open Book & Sun Rays in center -->
+  <g transform="translate(60, 50)">
+    <!-- Sun Rays -->
+    <path d="M -20,-10 L 0,-24 L 20,-10 Z" fill="url(#pgc-gold)" opacity="0.6"/>
+    <!-- Center Star -->
+    <polygon points="0,-18 2.5,-12 8.5,-12 3.5,-8.5 5.5,-2 0,-6 -5.5,-2 -3.5,-8.5 -8.5,-12 -2.5,-12" fill="url(#pgc-gold)"/>
+
+    <!-- Open Book -->
+    <path d="M -22,4 C -12,0 -4,0 0,2 C 4,0 12,0 22,4 L 22,18 C 12,14 4,14 0,16 C -4,14 -12,14 -22,18 Z" fill="#FFFFFF"/>
+    <path d="M 0,2 L 0,16" stroke="url(#pgc-gold)" stroke-width="1.5"/>
+  </g>
+
+  <!-- PGC Text -->
+  <text x="60" y="94" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="13" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">PGC</text>
+  <text x="60" y="104" font-family="sans-serif" font-weight="700" font-size="6" fill="url(#pgc-gold)" text-anchor="middle" letter-spacing="0.5">&amp; CADET COLLEGES</text>
+</svg>

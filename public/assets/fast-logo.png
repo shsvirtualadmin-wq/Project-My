@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <defs>
+    <linearGradient id="fast-blue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#002855"/>
+      <stop offset="100%" stop-color="#001229"/>
+    </linearGradient>
+    <linearGradient id="fast-cyan" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00A8E8"/>
+      <stop offset="100%" stop-color="#0077B6"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Outer Shield -->
+  <path d="M 60,6 C 88,6 104,16 104,44 C 104,80 60,112 60,112 C 60,112 16,80 16,44 C 16,16 32,6 60,6 Z" fill="url(#fast-blue)" stroke="url(#fast-cyan)" stroke-width="3"/>
+
+  <!-- Crescent & Star at top -->
+  <path d="M 54,16 A 7,7 0 1,0 63,25 A 9,9 0 1,1 54,16 Z" fill="url(#fast-cyan)"/>
+  <polygon points="63,18 64.5,21 68,21 65,23 66,26 63,24 60,26 61,23 58,21 61.5,21" fill="#FFFFFF"/>
+
+  <!-- Digital Tech Grid / Computer Icon -->
+  <g transform="translate(60, 52)">
+    <!-- Circuit Grid Box -->
+    <rect x="-24" y="-14" width="48" height="32" rx="4" fill="none" stroke="url(#fast-cyan)" stroke-width="2.5"/>
+    <line x1="-16" y1="-4" x2="16" y2="-4" stroke="#FFFFFF" stroke-width="2"/>
+    <line x1="-16" y1="4" x2="8" y2="4" stroke="#FFFFFF" stroke-width="2"/>
+    <line x1="-16" y1="12" x2="0" y2="12" stroke="url(#fast-cyan)" stroke-width="2"/>
+    <!-- Binary / Tech Nodes -->
+    <circle cx="14" cy="4" r="3" fill="url(#fast-cyan)"/>
+    <circle cx="8" cy="12" r="3" fill="#FFFFFF"/>
+  </g>
+
+  <!-- FAST Text -->
+  <text x="60" y="98" font-family="'Space Grotesk', sans-serif" font-weight="900" font-size="13" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">FAST</text>
+  <text x="60" y="106" font-family="sans-serif" font-weight="700" font-size="6" fill="url(#fast-cyan)" text-anchor="middle" letter-spacing="0.5">NUCES</text>
+</svg>

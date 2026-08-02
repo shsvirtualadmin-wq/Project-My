@@ -1,0 +1,107 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background Gradient -->
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#121212"/>
+      <stop offset="100%" stop-color="#020202"/>
+    </radialGradient>
+
+    <!-- Metallic Gold Main Gradient -->
+    <linearGradient id="goldMain" x1="120" y1="80" x2="380" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFF3A1"/>
+      <stop offset="25%" stop-color="#F7C82D"/>
+      <stop offset="55%" stop-color="#D99B00"/>
+      <stop offset="80%" stop-color="#FAD652"/>
+      <stop offset="100%" stop-color="#8C5C00"/>
+    </linearGradient>
+
+    <!-- Metallic Gold Highlight / Bevel Gradient -->
+    <linearGradient id="goldHighlight" x1="150" y1="80" x2="350" y2="280" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="30%" stop-color="#FFE875"/>
+      <stop offset="70%" stop-color="#E5A700"/>
+      <stop offset="100%" stop-color="#996800"/>
+    </linearGradient>
+
+    <!-- Metallic Gold Shadow Facet Gradient -->
+    <linearGradient id="goldShadow" x1="200" y1="150" x2="380" y2="350" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#C28900"/>
+      <stop offset="50%" stop-color="#734F00"/>
+      <stop offset="100%" stop-color="#3D2900"/>
+    </linearGradient>
+
+    <!-- Metallic Dark Chrome / Black Wing Gradient -->
+    <linearGradient id="darkChrome" x1="120" y1="330" x2="390" y2="420" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4E535B"/>
+      <stop offset="35%" stop-color="#24272B"/>
+      <stop offset="70%" stop-color="#0F1012"/>
+      <stop offset="100%" stop-color="#2A2D32"/>
+    </linearGradient>
+
+    <!-- Soft Ambient Gold Glow -->
+    <filter id="ambientGoldGlow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="6" stdDeviation="12" flood-color="#F2B90C" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+
+  <!-- Black Background Canvas -->
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+
+  <g filter="url(#ambientGoldGlow)">
+    <!-- ==================== BASE OPEN BOOK / WINGS ==================== -->
+    
+    <!-- Bottom Layer: Gold Wing Swooshes -->
+    <!-- Left Bottom Gold Swoosh -->
+    <path d="M256 425 C215 405 160 380 135 385 C165 398 210 422 256 440 Z" fill="url(#goldShadow)" />
+    <path d="M256 425 C215 405 160 380 135 385 C175 392 225 412 256 430 Z" fill="url(#goldHighlight)" />
+    <!-- Right Bottom Gold Swoosh -->
+    <path d="M256 425 C297 405 352 380 377 385 C347 398 302 422 256 440 Z" fill="url(#goldShadow)" />
+    <path d="M256 425 C297 405 352 380 377 385 C337 392 287 412 256 430 Z" fill="url(#goldHighlight)" />
+
+    <!-- Middle Layer: Dark Chrome / Black Metallic Swooshes -->
+    <!-- Left Middle Dark Swoosh -->
+    <path d="M256 415 C210 390 150 360 125 365 C160 375 210 398 256 425 Z" fill="url(#darkChrome)" />
+    <path d="M125 365 C160 372 210 392 256 418 C215 395 162 372 125 365 Z" fill="#6B717A" opacity="0.6"/>
+    <!-- Right Middle Dark Swoosh -->
+    <path d="M256 415 C302 390 362 360 387 365 C352 375 302 398 256 425 Z" fill="url(#darkChrome)" />
+    <path d="M387 365 C352 372 302 392 256 418 C297 395 350 372 387 365 Z" fill="#6B717A" opacity="0.6"/>
+
+    <!-- Top Layer: Primary Gold Open Book Wings -->
+    <!-- Left Top Gold Wing -->
+    <path d="M256 410 C200 375 145 320 140 315 C145 330 200 385 256 410 Z" fill="url(#goldShadow)"/>
+    <path d="M256 410 C195 360 148 318 140 315 C185 328 232 362 256 395 Z" fill="url(#goldMain)"/>
+    <path d="M256 395 C232 362 185 328 140 315 C185 322 230 350 256 385 Z" fill="url(#goldHighlight)"/>
+
+    <!-- Right Top Gold Wing -->
+    <path d="M256 410 C312 375 367 320 372 315 C367 330 312 385 256 410 Z" fill="url(#goldShadow)"/>
+    <path d="M256 410 C317 360 364 318 372 315 C327 328 280 362 256 395 Z" fill="url(#goldMain)"/>
+    <path d="M256 395 C280 362 327 328 372 315 C327 322 282 350 256 385 Z" fill="url(#goldHighlight)"/>
+
+
+    <!-- ==================== UPPER 3D EMBLEMATIC 'B' WITH CHECKMARK ==================== -->
+    
+    <!-- Left Vertical Chiseled Stem of 'B' -->
+    <!-- Left Stem Base Shadow Facet -->
+    <path d="M170 125 L205 100 L205 325 L170 325 Z" fill="url(#goldShadow)"/>
+    <!-- Left Stem Front Highlight Facet -->
+    <path d="M170 125 L205 100 L205 325 L170 295 Z" fill="url(#goldHighlight)"/>
+    <path d="M170 125 L205 100 L188 212 Z" fill="#FFFFFF" opacity="0.4"/>
+
+    <!-- Upper Loop of 'B' Outer Curve -->
+    <path d="M205 100 C270 100 350 110 350 170 C350 220 310 245 256 260 L205 260 L205 100 Z" fill="url(#goldMain)"/>
+    <!-- Upper Loop Inner Bevel Highlight -->
+    <path d="M205 100 C265 100 340 112 340 165 C340 205 305 235 256 245 L205 200 L205 100 Z" fill="url(#goldHighlight)"/>
+
+    <!-- Checkmark Sharp Inset inside B Center -->
+    <!-- Checkmark Down Stroke -->
+    <path d="M215 250 L250 295 L345 190 L320 170 L250 260 L230 235 Z" fill="url(#goldHighlight)"/>
+    <path d="M250 295 L345 190 L355 205 L250 315 L215 265 L230 250 Z" fill="url(#goldShadow)"/>
+
+    <!-- Lower Loop of 'B' Outer Sweep -->
+    <path d="M250 260 C310 265 365 285 365 330 C365 365 325 385 256 385 L205 385 L205 320 C220 320 238 300 250 260 Z" fill="url(#goldMain)"/>
+    <!-- Lower Loop Bevel Highlight -->
+    <path d="M250 260 C300 265 355 282 355 325 C355 355 318 375 256 375 L205 375 L205 325 C220 325 238 300 250 260 Z" fill="url(#goldHighlight)"/>
+    <!-- Lower Loop Shadow Bevel -->
+    <path d="M256 385 C325 385 365 365 365 330 C365 300 330 275 280 265 L295 275 C340 285 355 305 355 330 C355 355 320 375 256 375 Z" fill="url(#goldShadow)"/>
+  </g>
+</svg>
