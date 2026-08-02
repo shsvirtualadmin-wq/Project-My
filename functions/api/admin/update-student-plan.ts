@@ -181,11 +181,14 @@ export const onRequestPost = async (context: PagesContext) => {
   }
 };
 
+export const onRequestPatch = onRequestPost;
+export const onRequestPut = onRequestPost;
+
 export const onRequestOptions = async () => {
   return new Response(null, {
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Methods": "POST, PATCH, PUT, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
   });

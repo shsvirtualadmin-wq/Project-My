@@ -2648,7 +2648,13 @@ Ensure every question is 100% unique, highly relevant to ${subject}${effectiveTo
   });
 
   // API Endpoint: Admin Update Student Status (Suspend / Reactivate)
-  app.post("/api/admin/update-student-status", async (req, res) => {
+  app.all("/api/admin/update-student-status", async (req, res) => {
+    if (req.method === "OPTIONS") {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "POST, PATCH, PUT, DELETE, OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      return res.status(204).end();
+    }
     const { requesterEmail, studentId, status } = req.body;
 
     const { user: tokenUser, isAdmin: isTokenAdmin } = await verifyAuthToken(req);

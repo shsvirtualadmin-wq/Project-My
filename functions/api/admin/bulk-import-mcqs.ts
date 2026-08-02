@@ -77,6 +77,9 @@ export const onRequestPost = async (context: PagesContext) => {
   }
 };
 
+export const onRequestPatch = onRequestPost;
+export const onRequestPut = onRequestPost;
+
 export const onRequestOptions = async () => {
   return new Response(null, {
     headers: {

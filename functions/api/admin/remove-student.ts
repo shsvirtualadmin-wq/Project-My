@@ -18,7 +18,7 @@ const handleRemoveStudent = async (context: PagesContext) => {
   // Enable CORS
   const corsHeaders = {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "POST, DELETE, OPTIONS",
+    "Access-Control-Allow-Methods": "POST, DELETE, PATCH, PUT, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Content-Type": "application/json",
   };
@@ -141,11 +141,13 @@ const handleRemoveStudent = async (context: PagesContext) => {
 
 export const onRequestPost = handleRemoveStudent;
 export const onRequestDelete = handleRemoveStudent;
+export const onRequestPatch = handleRemoveStudent;
+export const onRequestPut = handleRemoveStudent;
 export const onRequestOptions = async () => {
   return new Response(null, {
     headers: {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "POST, DELETE, OPTIONS",
+      "Access-Control-Allow-Methods": "POST, DELETE, PATCH, PUT, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization",
     },
   });

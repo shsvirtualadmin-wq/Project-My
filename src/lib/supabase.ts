@@ -1344,14 +1344,39 @@ export async function removeStudentAccountInSupabase(
       }
     }
 
-    if (!resp.ok || !resData.success) {
-      const errorMsg = resData.error || resData.message || (resp.status ? `Request failed with status ${resp.status}` : 'Failed to wipe student account.');
-      return { success: false, message: errorMsg };
+    if (resp.ok && resData.success) {
+      // Direct Supabase fallback cleanup if configured
+      if (isSupabaseConfigured) {
+        try {
+          if (studentId) {
+            await supabase.from('test_results').delete().eq('student_id', studentId);
+            await supabase.from('mcq_attempts').delete().eq('student_id', studentId);
+            await supabase.from('student_mcq_usage').delete().eq('student_id', studentId);
+            await supabase.from('mcq_usage').delete().eq('student_id', studentId);
+            await supabase.from('student_progress').delete().eq('student_id', studentId);
+            await supabase.from('ai_history').delete().eq('student_id', studentId);
+            await supabase.from('study_buddy_history').delete().eq('student_id', studentId);
+            await supabase.from('study_buddy_usage').delete().eq('student_id', studentId);
+            await supabase.from('student_achievements').delete().eq('student_id', studentId);
+            await supabase.from('achievements').delete().eq('student_id', studentId);
+            await supabase.from('students').delete().eq('id', studentId);
+          }
+          if (studentEmail) {
+            await supabase.from('student_mcq_usage').delete().eq('email', studentEmail);
+            await supabase.from('mcq_usage').delete().eq('email', studentEmail);
+            await supabase.from('students').delete().eq('email', studentEmail);
+          }
+        } catch (e) {
+          console.warn('Direct Supabase deletion cleanup warning:', e);
+        }
+      }
+      return { success: true, message: 'Student account wiped successfully.' };
     }
 
-    // Direct Supabase fallback cleanup if configured
+    // Direct Supabase fallback if API route returned error
     if (isSupabaseConfigured) {
       try {
+        let deleted = false;
         if (studentId) {
           await supabase.from('test_results').delete().eq('student_id', studentId);
           await supabase.from('mcq_attempts').delete().eq('student_id', studentId);
@@ -1363,19 +1388,23 @@ export async function removeStudentAccountInSupabase(
           await supabase.from('study_buddy_usage').delete().eq('student_id', studentId);
           await supabase.from('student_achievements').delete().eq('student_id', studentId);
           await supabase.from('achievements').delete().eq('student_id', studentId);
-          await supabase.from('students').delete().eq('id', studentId);
+          const { error: delErr } = await supabase.from('students').delete().eq('id', studentId);
+          if (!delErr) deleted = true;
         }
-        if (studentEmail) {
-          await supabase.from('student_mcq_usage').delete().eq('email', studentEmail);
-          await supabase.from('mcq_usage').delete().eq('email', studentEmail);
-          await supabase.from('students').delete().eq('email', studentEmail);
+        if (studentEmail && !deleted) {
+          const { error: delErr2 } = await supabase.from('students').delete().eq('email', studentEmail);
+          if (!delErr2) deleted = true;
+        }
+        if (deleted) {
+          return { success: true, message: 'Student account wiped successfully.' };
         }
       } catch (e) {
-        console.warn('Direct Supabase deletion cleanup warning:', e);
+        console.warn('Direct Supabase deletion fallback warning:', e);
       }
     }
 
-    return { success: true, message: 'Student account wiped successfully.' };
+    const errorMsg = resData.error || resData.message || (resp.status ? `Request failed with status ${resp.status}` : 'Failed to wipe student account.');
+    return { success: false, message: errorMsg };
   } catch (err: any) {
     console.error('Error in removeStudentAccountInSupabase:', err);
     return { success: false, message: err?.message || 'Removal failed.' };
@@ -1401,11 +1430,21 @@ export async function updateStudentStatusInSupabase(
       localStorage.removeItem(`boardly_profile_${studentId}`);
     } catch {}
 
-    const resp = await apiFetch('/api/admin/update-student-status', {
+    let resp = await apiFetch('/api/admin/update-student-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ requesterEmail, studentId, status }),
     });
+
+    // Fallback if 405 Method Not Allowed occurs on POST
+    if (resp.status === 405) {
+      console.warn('/api/admin/update-student-status returned 405 on POST. Retrying with PATCH...');
+      resp = await apiFetch('/api/admin/update-student-status', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requesterEmail, studentId, status }),
+      });
+    }
 
     const text = await resp.text();
     let resData: any = {};
@@ -1417,19 +1456,30 @@ export async function updateStudentStatusInSupabase(
       }
     }
 
-    if (!resp.ok || !resData.success) {
-      return { success: false, message: resData.error || resData.message || (resp.status ? `Request failed with status ${resp.status}` : 'Failed to update status.') };
+    if (resp.ok && resData.success) {
+      if (isSupabaseConfigured) {
+        try {
+          await supabase.from('students').update({ status, updated_at: new Date().toISOString() }).eq('id', studentId);
+        } catch (e) {
+          console.warn('Direct Supabase status update warning:', e);
+        }
+      }
+      return { success: true, message: `Student status updated to ${status}.` };
     }
 
+    // Direct Supabase fallback if API route failed or returned non-ok
     if (isSupabaseConfigured) {
       try {
-        await supabase.from('students').update({ status, updated_at: new Date().toISOString() }).eq('id', studentId);
+        const { error: sbErr } = await supabase.from('students').update({ status, updated_at: new Date().toISOString() }).eq('id', studentId);
+        if (!sbErr) {
+          return { success: true, message: `Student status updated to ${status}.` };
+        }
       } catch (e) {
-        console.warn('Direct Supabase status update warning:', e);
+        console.warn('Direct Supabase fallback failed:', e);
       }
     }
 
-    return { success: true, message: `Student status updated to ${status}.` };
+    return { success: false, message: resData.error || resData.message || (resp.status ? `Request failed with status ${resp.status}` : 'Failed to update status.') };
   } catch (err: any) {
     console.error('Error in updateStudentStatusInSupabase:', err);
     return { success: false, message: err?.message || 'Status update failed.' };
