@@ -12,25 +12,18 @@ const DEFAULT_BOARDLY_SVG_PATHS = `
  */
 export function getWatermarkSvgDataUrl(customLogoUrl?: string | null): string {
   const activeLogo =
-    customLogoUrl !== undefined
-      ? customLogoUrl
-      : typeof window !== 'undefined'
-      ? localStorage.getItem('boardly_logo_url')
-      : null;
+    (customLogoUrl !== undefined && customLogoUrl !== null ? customLogoUrl : null) ||
+    (typeof window !== 'undefined' ? localStorage.getItem('boardly_logo_url') : null) ||
+    '/logo.png';
 
-  const logoTrimmed = activeLogo ? activeLogo.trim() : '';
+  const logoTrimmed = activeLogo ? activeLogo.trim() : '/logo.png';
 
-  let logoContent = '';
-  if (logoTrimmed) {
-    logoContent = `<image href="${logoTrimmed}" x="15" y="15" width="70" height="70" preserveAspectRatio="xMidYMid meet" opacity="0.15" />`;
-  } else {
-    logoContent = DEFAULT_BOARDLY_SVG_PATHS;
-  }
+  const logoContent = `<image href="${logoTrimmed}" x="15" y="15" width="70" height="70" preserveAspectRatio="xMidYMid meet" opacity="0.12" />`;
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
     <g transform="translate(100, 100) rotate(-32) translate(-50, -50)">
       ${logoContent}
-      <text x="50" y="104" text-anchor="middle" fill="#0f172a" font-size="9" font-family="'Inter', -apple-system, sans-serif" font-weight="900" letter-spacing="1.2" opacity="0.14">BOARDLY</text>
+      <text x="50" y="104" text-anchor="middle" fill="#0f172a" font-size="9" font-family="'Inter', -apple-system, sans-serif" font-weight="900" letter-spacing="1.2" opacity="0.12">BOARDLY</text>
     </g>
   </svg>`;
 

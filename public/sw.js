@@ -1,8 +1,10 @@
-const CACHE_NAME = 'shs-boardly-mcq-v1';
+const CACHE_NAME = 'shs-boardly-mcq-v2';
 
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
+  '/logo.png',
+  '/assets/boardly-logo.png',
   '/favicon.svg',
   '/boardly-logo.svg',
   '/manifest.json'

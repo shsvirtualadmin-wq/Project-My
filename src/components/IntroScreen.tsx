@@ -1285,8 +1285,18 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
             {/* Column 1: Brand Blurb */}
             <div className="space-y-3 sm:col-span-2 lg:col-span-1">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-[#F2B90C] text-[#0A0A0A] font-black text-xs flex items-center justify-center shadow-xs">
-                  B
+                <div className="w-8 h-8 rounded-lg bg-[#0A0A0A] border border-[#F2B90C]/40 p-0.5 flex items-center justify-center shadow-xs overflow-hidden shrink-0">
+                  <img
+                    src="/logo.png"
+                    alt="Boardly Logo"
+                    className="w-full h-full object-contain"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      if (target.src !== window.location.origin + '/logo.png') {
+                        target.src = '/logo.png';
+                      }
+                    }}
+                  />
                 </div>
                 <span
                   className="text-base font-black tracking-tight text-slate-900 dark:text-white"

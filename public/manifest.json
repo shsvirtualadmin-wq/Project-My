@@ -3,6 +3,11 @@
   "name": "Boardly — SHS Virtual Academy MCQ Portal",
   "icons": [
     {
+      "src": "/logo.png",
+      "type": "image/png",
+      "sizes": "192x192 512x512"
+    },
+    {
       "src": "/boardly-logo.svg",
       "type": "image/svg+xml",
       "sizes": "192x192 512x512"

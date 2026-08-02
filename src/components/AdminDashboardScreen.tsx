@@ -1066,8 +1066,20 @@ CREATE POLICY "Admin full access study_buddy_history" ON public.study_buddy_hist
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
-              <ShieldCheck className="w-6 h-6 text-[#0A84FF] dark:text-[#0A84FF] shrink-0" />
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-[#0A0A0A] border border-[#F2B90C]/40 p-0.5 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
+                <img
+                  src="/logo.png"
+                  alt="Boardly Logo"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== window.location.origin + '/logo.png') {
+                      target.src = '/logo.png';
+                    }
+                  }}
+                />
+              </div>
               <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight truncate">
                 Boardly Admin Portal
               </h1>

@@ -9,22 +9,9 @@ interface PdfOptions {
   studentName?: string;
 }
 
-const BOARDLY_LOGO_SVG = `<svg width="48" height="48" viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="goldMonogramGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#F2B90C" />
-      <stop offset="100%" stop-color="#D4A94A" />
-    </linearGradient>
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1A1814" />
-      <stop offset="100%" stop-color="#090909" />
-    </linearGradient>
-  </defs>
-
-  <rect x="4" y="4" width="232" height="232" rx="48" fill="url(#bgGrad)" stroke="#F2B90C" stroke-width="6" stroke-opacity="0.6" />
-  <rect x="28" y="28" width="184" height="184" rx="36" fill="url(#goldMonogramGrad)" />
-  <text x="120" y="152" font-family="'Space Grotesk', system-ui, sans-serif" font-size="128" font-weight="900" fill="#0A0A0A" text-anchor="middle">B</text>
-</svg>`;
+const BOARDLY_LOGO_SVG = `<div style="width: 48px; height: 48px; background: #0A0A0A; border: 1.5px solid #F2B90C; border-radius: 12px; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 4px;">
+  <img src="/logo.png" style="width: 100%; height: 100%; object-fit: contain;" />
+</div>`;
 
 /**
  * Checks if a string contains Urdu or Arabic script characters
@@ -75,9 +62,8 @@ export async function downloadQuizPdf({
   const urduChoiceLabels = ['الف', 'ب', 'ج', 'د'];
 
   const customLogoUrl = typeof window !== 'undefined' ? localStorage.getItem('boardly_logo_url') : null;
-  const logoContent = customLogoUrl
-    ? `<img src="${customLogoUrl}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" />`
-    : BOARDLY_LOGO_SVG;
+  const activeLogo = customLogoUrl || '/logo.png';
+  const logoContent = `<img src="${activeLogo}" style="width: 100%; height: 100%; object-fit: contain; border-radius: 8px;" />`;
 
   // Build HTML representation with RTL & Unicode font support (using inline SVG/image)
   let html = `

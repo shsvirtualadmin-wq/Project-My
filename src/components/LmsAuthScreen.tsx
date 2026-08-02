@@ -290,13 +290,17 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
       {/* Header Branding */}
       <div className="flex flex-col items-center text-center space-y-2 mb-5">
         <div className="w-12 h-12 bg-[#0A0A0A] border-2 border-[#F2B90C] rounded-2xl flex items-center justify-center shadow-lg mb-0.5 overflow-hidden p-1">
-          {logoUrl ? (
-            <img src={logoUrl} alt="Boardly Logo" className="w-full h-full object-contain" />
-          ) : (
-            <span className="font-['Space_Grotesk'] font-black text-2xl text-[#F2B90C] tracking-tighter">
-              B
-            </span>
-          )}
+          <img
+            src={logoUrl || "/logo.png"}
+            alt="Boardly Logo"
+            className="w-full h-full object-contain"
+            onError={(e) => {
+              const target = e.target as HTMLImageElement;
+              if (target.src !== window.location.origin + '/logo.png') {
+                target.src = '/logo.png';
+              }
+            }}
+          />
         </div>
 
         <h1 className="font-['Space_Grotesk'] font-black text-2xl sm:text-3xl tracking-widest text-[#F2B90C] uppercase leading-none">

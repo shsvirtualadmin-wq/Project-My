@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { TestResult } from '../types';
 import { User } from '../lib/supabase';
 import { SecurityWatermark } from './SecurityWatermark';
+import { useSiteSettings } from '../context/SiteSettingsContext';
 import { downloadQuizPdf } from '../lib/pdfGenerator';
 import {
   RotateCcw,
@@ -39,6 +40,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
   onBackToHome,
   onExplainMcq,
 }) => {
+  const { logoUrl } = useSiteSettings();
   const [showReview, setShowReview] = useState(false);
   const [filter, setFilter] = useState<'all' | 'wrong' | 'flagged'>('all');
   const [copied, setCopied] = useState(false);
@@ -141,13 +143,38 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
       <SecurityWatermark currentUser={currentUser} />
 
       <div className="relative z-10 flex flex-col h-full gap-4">
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-[#0A0A0A] dark:text-[#F2B90C] bg-[#F2B90C]/20 border border-[#F2B90C]/40 px-3 py-1 rounded-full">
-            {isUrduOrIslamiat ? 'امتحانی پرچہ مکمل ہوا' : 'Test Completed'}
-          </span>
-          <span className="text-xs font-bold text-slate-500">
-            {dateFormatted}
-          </span>
+        <div className="flex items-center justify-between pb-2 border-b border-black/5 dark:border-white/10">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[#0A0A0A] border-2 border-[#F2B90C] rounded-2xl p-1 flex items-center justify-center shadow-md overflow-hidden shrink-0">
+              <img
+                src={logoUrl || "/logo.png"}
+                alt="Boardly Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (target.src !== window.location.origin + '/logo.png') {
+                    target.src = '/logo.png';
+                  }
+                }}
+              />
+            </div>
+            <div>
+              <h2 className="font-['Space_Grotesk'] font-black text-base sm:text-lg text-slate-900 dark:text-white uppercase tracking-wider leading-none">
+                BOARDLY ACADEMY
+              </h2>
+              <p className="text-[10px] sm:text-[11px] font-bold text-[#F2B90C] tracking-wide mt-0.5">
+                Official Score &amp; Evaluation Report
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-col items-end gap-1">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0A0A0A] dark:text-[#F2B90C] bg-[#F2B90C]/20 border border-[#F2B90C]/40 px-3 py-1 rounded-full">
+              {isUrduOrIslamiat ? 'امتحانی پرچہ مکمل ہوا' : 'Test Completed'}
+            </span>
+            <span className="text-[11px] font-bold text-slate-500">
+              {dateFormatted}
+            </span>
+          </div>
         </div>
 
         {/* Hero Score Card */}

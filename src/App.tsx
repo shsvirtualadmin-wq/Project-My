@@ -1848,8 +1848,20 @@ export function App() {
         <div className="fixed inset-0 z-[300] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 animate-ios-spring">
           <div className="bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-white/10 rounded-3xl p-6 sm:p-8 max-w-sm w-full shadow-2xl flex flex-col items-center text-center gap-4">
             <div className="relative flex items-center justify-center">
-              <div className="w-14 h-14 rounded-full border-4 border-[#F2B90C]/20 border-t-[#F2B90C] animate-spin" />
-              <Sparkles className="w-6 h-6 text-[#F2B90C] absolute animate-pulse" />
+              <div className="w-16 h-16 rounded-full border-4 border-[#F2B90C]/20 border-t-[#F2B90C] animate-spin" />
+              <div className="w-8 h-8 absolute rounded-full overflow-hidden p-0.5 bg-[#0A0A0A] border border-[#F2B90C]/40 flex items-center justify-center shadow-sm">
+                <img
+                  src="/logo.png"
+                  alt="Boardly Logo"
+                  className="w-full h-full object-contain"
+                  onError={(e) => {
+                    const target = e.target as HTMLImageElement;
+                    if (target.src !== window.location.origin + '/logo.png') {
+                      target.src = '/logo.png';
+                    }
+                  }}
+                />
+              </div>
             </div>
             <div>
               <h3 className="font-['Space_Grotesk'] text-lg font-extrabold text-slate-900 dark:text-white">

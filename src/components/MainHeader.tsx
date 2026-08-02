@@ -228,10 +228,15 @@ export const MainHeader: React.FC<MainHeaderProps> = React.memo(({
           >
             <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-[12px] bg-[#0A0A0A] flex items-center justify-center shrink-0 border border-[#F2B90C]/40 shadow-[0_0_12px_rgba(242,185,12,0.2)] group-hover:shadow-[0_0_20px_rgba(242,185,12,0.45)] group-hover:border-[#F2B90C] group-hover:scale-105 transition-all duration-300 overflow-hidden p-0.5">
               <img
-                src={logoUrl || "/assets/boardly-logo.png"}
+                src={logoUrl || "/logo.png"}
                 alt="Boardly Logo"
                 className="w-full h-full object-contain rounded-[8px] transition-transform duration-300 group-hover:scale-105"
-                referrerPolicy="no-referrer"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (target.src !== window.location.origin + '/logo.png') {
+                    target.src = '/logo.png';
+                  }
+                }}
               />
             </div>
 
@@ -496,6 +501,25 @@ export const MainHeader: React.FC<MainHeaderProps> = React.memo(({
       {/* Mobile Mega-Menu Drawer */}
       {mobileMenuOpen && (
         <div className="max-w-7xl mx-auto w-full pt-3 pb-2 border-t border-slate-200/80 dark:border-white/10 mt-3 space-y-3 animate-ios-spring">
+          {/* Mobile Menu Logo Header */}
+          <div className="flex items-center gap-2.5 px-3 py-1.5 mb-1 border-b border-slate-200/60 dark:border-white/10">
+            <div className="w-7 h-7 bg-[#0A0A0A] border border-[#F2B90C]/40 rounded-xl p-0.5 flex items-center justify-center overflow-hidden shrink-0">
+              <img
+                src={logoUrl || "/logo.png"}
+                alt="Boardly Logo"
+                className="w-full h-full object-contain"
+                onError={(e) => {
+                  const target = e.target as HTMLImageElement;
+                  if (target.src !== window.location.origin + '/logo.png') {
+                    target.src = '/logo.png';
+                  }
+                }}
+              />
+            </div>
+            <span className="font-['Space_Grotesk'] font-black text-sm tracking-widest text-[#F2B90C] uppercase">
+              BOARDLY MENU
+            </span>
+          </div>
           <div className="flex flex-col gap-1.5 text-xs font-bold text-slate-800 dark:text-slate-200">
             {/* 1. LOGGED-OUT VISITOR LINKS */}
             {isLoggedOut && (

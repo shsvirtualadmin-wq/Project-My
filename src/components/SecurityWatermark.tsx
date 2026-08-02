@@ -27,14 +27,29 @@ export const SecurityWatermark: React.FC<SecurityWatermarkProps> = ({ currentUse
       aria-hidden="true"
       className="absolute inset-0 pointer-events-none select-none overflow-hidden z-0 rounded-[28px] opacity-100"
     >
-      {/* Layer 1: Boardly Logo Pattern (Opacity ~6%) */}
+      {/* Layer 1: Boardly Logo Pattern (Opacity ~5-8%) */}
       <div
-        className="absolute inset-0 opacity-[0.05] dark:opacity-[0.08] bg-repeat bg-[length:120px_120px]"
+        className="absolute inset-0 opacity-[0.05] dark:opacity-[0.08] bg-repeat bg-[length:140px_140px]"
         style={{
-          backgroundImage: `url('${logoUrl || '/assets/boardly-logo.png'}')`,
+          backgroundImage: `url('${logoUrl || '/logo.png'}')`,
           backgroundPosition: 'center',
         }}
       />
+
+      {/* Layer 2: Large Subtle Central Emblem Watermark (~6-10% opacity) */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 sm:w-96 sm:h-96 opacity-[0.07] dark:opacity-[0.10] flex items-center justify-center pointer-events-none">
+        <img
+          src={logoUrl || '/logo.png'}
+          alt=""
+          className="w-full h-full object-contain filter drop-shadow-sm select-none"
+          onError={(e) => {
+            const target = e.target as HTMLImageElement;
+            if (target.src !== window.location.origin + '/logo.png') {
+              target.src = '/logo.png';
+            }
+          }}
+        />
+      </div>
 
       {/* Layer 2: Student Identity Text Diagonal Stamp (~-28deg rotation, opacity ~7%) */}
       <div className="absolute -inset-20 flex flex-col justify-around rotate-[-28deg] scale-110 opacity-[0.07] dark:opacity-[0.11]">

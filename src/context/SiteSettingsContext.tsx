@@ -6,12 +6,12 @@ interface SiteSettingsContextType {
 }
 
 const SiteSettingsContext = createContext<SiteSettingsContextType>({
-  logoUrl: null,
+  logoUrl: '/logo.png',
   refreshSiteSettings: async () => {},
 });
 
 export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [logoUrl] = useState<string | null>(null);
+  const [logoUrl] = useState<string | null>('/logo.png');
 
   // Maintain favicon setting
   useEffect(() => {
