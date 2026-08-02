@@ -68,6 +68,13 @@ const PAYMENT_METHODS = [
   },
 ];
 
+const PRICING_TIERS = [
+  { id: 'Matric', title: 'Matric', subtitle: '9th & 10th Class', fee: '499', label: 'Matric (9th/10th)', desc: 'Full MCQ Bank & Past Papers' },
+  { id: 'FSc', title: 'FSc', subtitle: '1st & 2nd Year', fee: '999', label: 'FSc (1st/2nd Year)', desc: 'Pre-Med & Engineering' },
+  { id: 'MDCAT', title: 'MDCAT', subtitle: 'Medical Entry Test', fee: '1499', label: 'MDCAT Prep', desc: 'Complete MDCAT Prep' },
+  { id: 'TCAT / ECAT', title: 'TCAT / ECAT', subtitle: 'Engineering Entry Test', fee: '1499', label: 'TCAT / ECAT', desc: 'ECAT Prep & Mocks' },
+];
+
 export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
   isOpen,
   onClose,
@@ -76,7 +83,21 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
   onSubmitted,
 }) => {
   const [selectedMethod, setSelectedMethod] = useState<string>('JazzCash');
-  const [amount, setAmount] = useState<string>('1500');
+  const [selectedTier, setSelectedTier] = useState<string>(() => {
+    const grade = (studentProfile?.grade || '').toLowerCase();
+    if (grade.includes('matric') || grade.includes('9th') || grade.includes('10th')) return 'Matric';
+    if (grade.includes('fsc') || grade.includes('11th') || grade.includes('12th')) return 'FSc';
+    if (grade.includes('mdcat') || grade.includes('medical')) return 'MDCAT';
+    return 'TCAT / ECAT';
+  });
+
+  const [amount, setAmount] = useState<string>(() => {
+    const grade = (studentProfile?.grade || '').toLowerCase();
+    if (grade.includes('matric') || grade.includes('9th') || grade.includes('10th')) return '499';
+    if (grade.includes('fsc') || grade.includes('11th') || grade.includes('12th')) return '999';
+    return '1499';
+  });
+
   const [transactionRef, setTransactionRef] = useState<string>('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
@@ -92,6 +113,12 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSelectTier = (tierId: string, fee: string) => {
+    setSelectedTier(tierId);
+    setAmount(fee);
+    setError(null);
   };
 
   const handleFileChange = (file: File | null) => {
@@ -149,6 +176,18 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
     setIsSubmitting(true);
 
     try {
+      console.log('[PaymentProofModal] Submitting payment proof form:', {
+        studentId,
+        studentName,
+        studentEmail,
+        paymentMethod: selectedMethod,
+        amount,
+        selectedTier,
+        transactionRef,
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+      });
+
       const formData = new FormData();
       formData.append('student_id', studentId);
       formData.append('student_name', studentName);
@@ -156,18 +195,24 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
       formData.append('payment_method', selectedMethod);
       formData.append('amount', amount);
       formData.append('transaction_reference', transactionRef);
+      formData.append('course_tier', selectedTier);
+      formData.append('tier', selectedTier);
       formData.append('file', selectedFile);
 
       const res = await submitPaymentProofApi(formData);
+      console.log('[PaymentProofModal] API submission response:', res);
 
       if (res.success && res.data) {
         setIsSuccess(true);
         setSubmittedData(res.data);
         if (onSubmitted) onSubmitted(res.data);
       } else {
-        setError(res.error || 'Failed to submit payment proof. Please try again.');
+        const errorMsg = res.error || 'Failed to submit payment proof. Please try again.';
+        console.error('[PaymentProofModal] Submission failed:', errorMsg);
+        setError(errorMsg);
       }
     } catch (err: any) {
+      console.error('[PaymentProofModal] Exception during submission:', err);
       setError(err?.message || 'Error uploading payment proof.');
     } finally {
       setIsSubmitting(false);
@@ -274,17 +319,12 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
                 </div>
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-                  {[
-                    { title: 'Matric', subtitle: '9th & 10th Class', fee: '499', desc: 'Full MCQ Bank & Past Papers' },
-                    { title: 'FSc', subtitle: '1st & 2nd Year', fee: '999', desc: 'Pre-Med & Engineering' },
-                    { title: 'MDCAT', subtitle: 'Medical Entry Test', fee: '1499', desc: 'Complete MDCAT Prep' },
-                    { title: 'TCAT / ECAT', subtitle: 'Engineering Entry Test', fee: '1499', desc: 'ECAT Prep & Mocks' },
-                  ].map((tier) => {
-                    const isTierSelected = amount === tier.fee;
+                  {PRICING_TIERS.map((tier) => {
+                    const isTierSelected = selectedTier === tier.id;
                     return (
                       <div
-                        key={tier.title}
-                        onClick={() => setAmount(tier.fee)}
+                        key={tier.id}
+                        onClick={() => handleSelectTier(tier.id, tier.fee)}
                         className={`p-3 rounded-xl border transition-all cursor-pointer flex flex-col justify-between ${
                           isTierSelected
                             ? 'bg-emerald-600 text-white border-emerald-700 shadow-md ring-2 ring-emerald-500/40 scale-[1.02]'
@@ -393,18 +433,13 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
                     Select Your Grade / Test Course Fee Tier
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { label: 'Matric (9th/10th)', fee: '499' },
-                      { label: 'FSc (1st/2nd Year)', fee: '999' },
-                      { label: 'MDCAT Prep', fee: '1499' },
-                      { label: 'TCAT / ECAT', fee: '1499' },
-                    ].map((tier) => {
-                      const isTierSelected = amount === tier.fee;
+                    {PRICING_TIERS.map((tier) => {
+                      const isTierSelected = selectedTier === tier.id;
                       return (
                         <button
-                          key={tier.label}
+                          key={tier.id}
                           type="button"
-                          onClick={() => setAmount(tier.fee)}
+                          onClick={() => handleSelectTier(tier.id, tier.fee)}
                           className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
                             isTierSelected
                               ? 'border-emerald-500 bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-900 dark:text-emerald-100 ring-2 ring-emerald-500/30'
