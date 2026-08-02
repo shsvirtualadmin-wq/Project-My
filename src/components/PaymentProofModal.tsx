@@ -99,6 +99,9 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
   });
 
   const [transactionRef, setTransactionRef] = useState<string>('');
+  const [studentEmail, setStudentEmail] = useState<string>(() => {
+    return currentUser?.email || studentProfile?.email || '';
+  });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreview, setFilePreview] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -164,12 +167,12 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
       return;
     }
 
-    const studentId = currentUser?.id || studentProfile?.id;
-    const studentEmail = currentUser?.email || studentProfile?.email;
+    const studentId = currentUser?.id || studentProfile?.id || `anon-${Date.now()}`;
+    const resolvedEmail = (studentEmail || currentUser?.email || studentProfile?.email || '').trim();
     const studentName = studentProfile?.name || currentUser?.user_metadata?.full_name || 'Student';
 
-    if (!studentId || !studentEmail) {
-      setError('Student identity not found. Please log in first.');
+    if (!resolvedEmail || !/\S+@\S+\.\S+/.test(resolvedEmail)) {
+      setError('Please enter a valid email address to receive your confirmation receipt.');
       return;
     }
 
@@ -179,7 +182,7 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
       console.log('[PaymentProofModal] Submitting payment proof form:', {
         studentId,
         studentName,
-        studentEmail,
+        studentEmail: resolvedEmail,
         paymentMethod: selectedMethod,
         amount,
         selectedTier,
@@ -191,7 +194,7 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
       const formData = new FormData();
       formData.append('student_id', studentId);
       formData.append('student_name', studentName);
-      formData.append('student_email', studentEmail);
+      formData.append('student_email', resolvedEmail);
       formData.append('payment_method', selectedMethod);
       formData.append('amount', amount);
       formData.append('transaction_reference', transactionRef);
@@ -456,37 +459,53 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-4 pt-1">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                      Amount Paid (PKR) <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                        PKR
-                      </span>
-                      <input
-                        type="number"
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        placeholder="e.g. 499, 999, or 1499"
-                        className="w-full pl-12 pr-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
-                      Transaction Reference / ID <span className="text-slate-400 font-normal">(Optional)</span>
+                      Your Email Address (For Confirmation Receipt) <span className="text-red-500">*</span>
                     </label>
                     <input
-                      type="text"
-                      value={transactionRef}
-                      onChange={(e) => setTransactionRef(e.target.value)}
-                      placeholder="e.g. TRX9823412"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm font-mono font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      type="email"
+                      value={studentEmail}
+                      onChange={(e) => setStudentEmail(e.target.value)}
+                      placeholder="student@example.com"
+                      className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      required
                     />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+                        Amount Paid (PKR) <span className="text-red-500">*</span>
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
+                          PKR
+                        </span>
+                        <input
+                          type="number"
+                          value={amount}
+                          onChange={(e) => setAmount(e.target.value)}
+                          placeholder="e.g. 499, 999, or 1499"
+                          className="w-full pl-12 pr-4 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-zinc-300 mb-1.5">
+                        Transaction Reference / ID <span className="text-slate-400 font-normal">(Optional)</span>
+                      </label>
+                      <input
+                        type="text"
+                        value={transactionRef}
+                        onChange={(e) => setTransactionRef(e.target.value)}
+                        placeholder="e.g. TRX9823412"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 dark:bg-zinc-900 border border-slate-200 dark:border-zinc-800 rounded-xl text-sm font-mono font-medium text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
