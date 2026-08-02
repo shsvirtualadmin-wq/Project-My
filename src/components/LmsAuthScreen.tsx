@@ -296,8 +296,10 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
             className="w-full h-full object-contain"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
-              if (target.src !== window.location.origin + '/logo.png') {
+              if (!target.src.endsWith('/logo.png')) {
                 target.src = '/logo.png';
+              } else if (!target.src.endsWith('/logo.svg')) {
+                target.src = '/logo.svg';
               }
             }}
           />

@@ -62,8 +62,10 @@ export const HeaderLogo: React.FC<HeaderLogoProps> = ({
           className="w-full h-full object-contain rounded-xl transition-transform duration-300 group-hover:scale-105"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
-            if (target.src !== window.location.origin + '/logo.png') {
+            if (!target.src.endsWith('/logo.png')) {
               target.src = '/logo.png';
+            } else if (!target.src.endsWith('/logo.svg')) {
+              target.src = '/logo.svg';
             }
           }}
         />
