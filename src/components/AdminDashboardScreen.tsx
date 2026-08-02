@@ -1074,11 +1074,7 @@ CREATE POLICY "Admin full access study_buddy_history" ON public.study_buddy_hist
                   className="w-full h-full object-contain"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    if (!target.src.endsWith('/logo.png')) {
-                      target.src = '/logo.png';
-                    } else if (!target.src.endsWith('/logo.svg')) {
-                      target.src = '/logo.svg';
-                    }
+                    target.src = '/logo.png';
                   }}
                 />
               </div>

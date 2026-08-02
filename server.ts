@@ -71,6 +71,16 @@ function isAdminEmail(email?: string | null): boolean {
   return ADMIN_EMAILS.includes(normalized) || normalized.includes("admin");
 }
 
+const PAYMENT_RULE_DEPLOYMENT_DATE = '2026-08-01T09:00:00.000Z';
+function isStudentExistingBeforeRule(createdAtStr?: string): boolean {
+  if (!createdAtStr) return true;
+  try {
+    return new Date(createdAtStr).getTime() < new Date(PAYMENT_RULE_DEPLOYMENT_DATE).getTime();
+  } catch {
+    return true;
+  }
+}
+
 /**
  * Server-side Bearer JWT verification against Supabase Auth.
  * Strictly verifies user identity and admin role server-side.
@@ -1624,6 +1634,54 @@ async function startServer() {
     const isMdcatFullMock = isFullMock && (rawSubject.toLowerCase().includes("mdcat") || String(classNum) === "MDCAT" || String(group) === "MDCAT");
     const isTcatFullMock = isFullMock && (rawSubject.toLowerCase().includes("tcat") || String(classNum) === "TCAT" || String(group) === "TCAT");
     const isAnyFullMock = isFullMock || rawSubject.toLowerCase().includes("full mock") || (requestedTopic && String(requestedTopic).toLowerCase().includes("full mock"));
+
+    // Server-side Payment & Subscription Status Enforcement
+    const isAdminUser = isAdminEmail(userEmail);
+    if (userId && userId !== "guest" && !isAdminUser) {
+      let studentRecord: any = null;
+      const supabaseClient = getSupabaseAdminClient() || getAuthClient(req);
+      if (supabaseClient) {
+        try {
+          const { data } = await supabaseClient
+            .from("students")
+            .select("*")
+            .eq("id", userId)
+            .maybeSingle();
+          studentRecord = data;
+        } catch (dbErr) {
+          console.warn("[Server Payment Check DB Error]:", dbErr);
+        }
+      }
+
+      if (studentRecord) {
+        const isExistingStudent = isStudentExistingBeforeRule(studentRecord.created_at);
+        const isExemptOrVerified = isExistingStudent || studentRecord.requires_payment === false || studentRecord.payment_status === 'Verified & Paid';
+        const isFreePlanOnly = studentRecord.payment_status === 'Free Plan' || (Array.isArray(studentRecord.subscribed_plans) && studentRecord.subscribed_plans.length === 1 && studentRecord.subscribed_plans[0] === 'free');
+
+        // Check 1: Non-free paid plan selected, but status is not Verified & Paid (unpaid / pending verification / rejected)
+        if (!isExemptOrVerified && !isFreePlanOnly) {
+          return res.status(403).json({
+            success: false,
+            locked: true,
+            paymentRequired: true,
+            paymentStatus: studentRecord.payment_status || 'Unpaid',
+            error: `Payment Verification Required: Access to paid plans requires an active and verified subscription. Your payment status is '${studentRecord.payment_status || 'Unpaid'}'. Please submit payment proof for approval.`,
+            message: `Payment Verification Required: Access to paid plans requires an active and verified subscription.`
+          });
+        }
+
+        // Check 2: Free Plan user trying to access paid entrance exam tracks (MDCAT/TCAT)
+        if (isFreePlanOnly && (isMdcatFullMock || isTcatFullMock || rawSubject.toLowerCase().includes("mdcat") || rawSubject.toLowerCase().includes("tcat"))) {
+          return res.status(403).json({
+            success: false,
+            locked: true,
+            paymentRequired: true,
+            error: "Paid Subscription Required: MDCAT and TCAT entrance prep requires a paid plan. Please upgrade your plan.",
+            message: "Paid Subscription Required: MDCAT and TCAT entrance prep requires a paid plan."
+          });
+        }
+      }
+    }
 
     if (isMdcatFullMock || (isAnyFullMock && rawSubject.toLowerCase().includes("mdcat"))) {
       console.log(`[Full Mock Request] MDCAT Full Mock (Offset: ${batchOffset}, Count: ${requestedCount})`);
@@ -3530,6 +3588,20 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         } else if (data) {
           insertedData = data;
         }
+
+        // Update student profile payment status to Pending Verification
+        try {
+          await supabaseAdmin
+            .from('students')
+            .update({
+              payment_status: 'Pending Verification',
+              requires_payment: true,
+              updated_at: new Date().toISOString(),
+            })
+            .or(`id.eq.${student_id},email.eq.${student_email}`);
+        } catch (stErr) {
+          console.warn("[Error updating student payment_status on proof upload]:", stErr);
+        }
       }
 
       // Send Confirmation Email
@@ -3679,6 +3751,22 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
           html: appEmail,
         }).catch(e => console.error("Error sending approval email:", e));
       } else {
+        const studentId = requestRow.student_id;
+        const studentEmail = requestRow.student_email;
+
+        try {
+          await supabaseAdmin
+            .from('students')
+            .update({
+              payment_status: 'Rejected',
+              requires_payment: true,
+              updated_at: new Date().toISOString(),
+            })
+            .or(`id.eq.${studentId},email.eq.${studentEmail}`);
+        } catch (rejErr) {
+          console.warn("[Error updating student payment_status on rejection]:", rejErr);
+        }
+
         // Send Rejection Email
         const rejEmail = generatePaymentRejectedEmail({
           name: requestRow.student_name || 'Student',

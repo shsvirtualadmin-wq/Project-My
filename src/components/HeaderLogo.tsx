@@ -57,16 +57,12 @@ export const HeaderLogo: React.FC<HeaderLogoProps> = ({
       {/* Custom or Monogram Logo Image Badge */}
       <div className="w-14 h-14 mb-2 rounded-2xl bg-[#0A0A0A] border-2 border-[#F2B90C]/40 p-1 shadow-[0_0_16px_rgba(242,185,12,0.25)] group-hover:shadow-[0_0_24px_rgba(242,185,12,0.5)] group-hover:border-[#F2B90C] group-hover:scale-105 transition-all duration-300 overflow-hidden flex items-center justify-center">
         <img
-          src={logoUrl || "/logo.svg"}
+          src={logoUrl || "/logo.png"}
           alt="Boardly Logo"
           className="w-full h-full object-contain rounded-xl transition-transform duration-300 group-hover:scale-105"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
-            if (!target.src.endsWith('/logo.svg')) {
-              target.src = '/logo.svg';
-            } else if (!target.src.endsWith('/logo.png')) {
-              target.src = '/logo.png';
-            }
+            target.src = '/logo.png';
           }}
         />
       </div>

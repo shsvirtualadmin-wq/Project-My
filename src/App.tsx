@@ -57,6 +57,7 @@ type ScreenType =
   | 'intro'
   | 'guided_wizard'
   | 'plan_selection'
+  | 'payment_required'
   | 'grades_flow'
   | 'group'
   | 'dashboard'
@@ -380,7 +381,32 @@ export function App() {
       .filter(Boolean)
       .join(' + ');
 
+    const hasPaidPlan = selectedPlanIds.some((id) => {
+      const opt = PLAN_OPTIONS.find((p) => p.id === id);
+      return opt && opt.numericPrice > 0;
+    });
+
     const provider = currentUser.app_metadata?.provider || 'email';
+
+    let nextPaymentStatus = userProfile?.payment_status || 'Unpaid';
+    let nextRequiresPayment = true;
+
+    if (!hasPaidPlan) {
+      nextPaymentStatus = 'Free Plan';
+      nextRequiresPayment = false;
+    } else {
+      if (userProfile?.payment_status === 'Verified & Paid') {
+        nextPaymentStatus = 'Verified & Paid';
+        nextRequiresPayment = false;
+      } else if (userProfile?.payment_status === 'Pending Verification') {
+        nextPaymentStatus = 'Pending Verification';
+        nextRequiresPayment = true;
+      } else {
+        nextPaymentStatus = 'Unpaid';
+        nextRequiresPayment = true;
+      }
+    }
+
     const updatedProfile: StudentProfile = {
       ...(userProfile || {
         id: currentUser.id,
@@ -392,9 +418,9 @@ export function App() {
       }),
       is_registered: true,
       subscribed_plans: selectedPlanIds,
-      package_name: planNames || (selectedPlanIds.includes('free') ? 'Free Plan' : 'Paid Subscription'),
-      payment_status: selectedPlanIds.includes('free') ? 'Free Plan' : 'Active Subscription',
-      requires_payment: false,
+      package_name: planNames || (hasPaidPlan ? 'Paid Subscription' : 'Free Plan'),
+      payment_status: nextPaymentStatus,
+      requires_payment: nextRequiresPayment,
       updated_at: new Date().toISOString(),
     };
 
@@ -423,7 +449,13 @@ export function App() {
     }
 
     setTrackNotice(null);
-    setScreen('dashboard');
+
+    if (hasPaidPlan && nextRequiresPayment) {
+      setScreen('payment_required');
+      setShowPaymentModal(true);
+    } else {
+      setScreen('dashboard');
+    }
   };
 
   useEffect(() => {
@@ -507,6 +539,18 @@ export function App() {
       } else if ((!userProfile?.subscribed_plans || userProfile.subscribed_plans.length === 0) && !isPaymentApprovedOrExempt) {
         if (screen !== 'plan_selection' && screen !== 'guided_wizard' && screen !== 'auth' && screen !== 'intro') {
           setScreen('plan_selection');
+        }
+      } else if (
+        userProfile?.requires_payment &&
+        userProfile?.payment_status !== 'Verified & Paid' &&
+        !(userProfile?.created_at && isStudentExistingBeforeRule(userProfile.created_at))
+      ) {
+        const plans = userProfile?.subscribed_plans || [];
+        const isFreeOnly = plans.length === 1 && plans[0] === 'free';
+        if (!isFreeOnly) {
+          if (screen !== 'payment_required' && screen !== 'plan_selection' && screen !== 'auth' && screen !== 'intro') {
+            setScreen('payment_required');
+          }
         }
       } else if (['dashboard', 'subject', 'duration', 'test'].includes(screen)) {
         const allowed = isTrackAllowedForUser(userProfile, selectedClass, isAdmin);
@@ -1301,6 +1345,25 @@ export function App() {
     setPendingTestParams(fullParams);
 
     if (currentUser) {
+      if (!isAdmin) {
+        const isExempt =
+          userProfile?.payment_status === 'Verified & Paid' ||
+          (userProfile?.requires_payment === false &&
+            userProfile?.payment_status !== 'Unpaid' &&
+            userProfile?.payment_status !== 'Pending Verification' &&
+            userProfile?.payment_status !== 'Rejected') ||
+          (userProfile?.created_at && isStudentExistingBeforeRule(userProfile.created_at));
+
+        const plans = userProfile?.subscribed_plans || [];
+        const isFreeOnly = plans.length === 1 && plans[0] === 'free';
+
+        if (!isExempt && !isFreeOnly) {
+          setIsGenerating(false);
+          setScreen('payment_required');
+          setShowPaymentModal(true);
+          return;
+        }
+      }
       executeStartTest(fullParams);
     } else {
       setIsGenerating(false);
@@ -1624,6 +1687,22 @@ export function App() {
                     />
                   </div>
                 )}
+                {screen === 'payment_required' && currentUser && (
+                  <PaymentRequiredScreen
+                    currentUser={currentUser}
+                    userProfile={userProfile}
+                    onOpenPaymentModal={() => setShowPaymentModal(true)}
+                    onRefreshProfile={async () => {
+                      await refreshUserProfile();
+                    }}
+                    onSignOut={async () => {
+                      await supabase.auth.signOut();
+                      setCurrentUser(null);
+                      setUserProfile(null);
+                      setScreen('intro');
+                    }}
+                  />
+                )}
                 {screen === 'grades_flow' && (
                   <GradesFlowScreen
                     onSelectClass={handleSelectClass}
@@ -1884,11 +1963,7 @@ export function App() {
                   className="w-full h-full object-contain"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    if (!target.src.endsWith('/logo.png')) {
-                      target.src = '/logo.png';
-                    } else if (!target.src.endsWith('/logo.svg')) {
-                      target.src = '/logo.svg';
-                    }
+                    target.src = '/logo.png';
                   }}
                 />
               </div>
