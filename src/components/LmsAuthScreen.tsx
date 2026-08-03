@@ -267,6 +267,13 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
         },
       });
 
+      console.log('====================================');
+      console.log('[SUPABASE AUTH SIGNUP RESPONSE]');
+      console.log('Email:', trimmedEmail);
+      console.log('Data:', JSON.stringify(data, null, 2));
+      console.log('Error:', authErr);
+      console.log('====================================');
+
       if (authErr) throw authErr;
 
       if (data.user) {
@@ -771,30 +778,73 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
           </div>
         </div>
       ) : mode === 'signup_success' ? (
-        <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-4 shadow-xl">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
+        <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-5 shadow-xl animate-fadeIn">
+          <div className="w-12 h-12 rounded-2xl bg-[#F2B90C]/10 border border-[#F2B90C]/30 text-[#F2B90C] flex items-center justify-center mx-auto mb-2">
             <Mail className="w-6 h-6" />
           </div>
-          <div className="space-y-1">
-            <h3 className="text-base font-extrabold text-white">Verification Email Sent</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              We have sent a confirmation email to <strong className="text-amber-400">{email}</strong>.
-            </p>
-            <p className="text-[11px] text-slate-400 leading-relaxed pt-1">
-              Please check your inbox (and spam folder) to complete verification.
-            </p>
+          <h3 className="text-lg font-black text-white leading-tight">
+            How would you like to verify your email?
+          </h3>
+          <p className="text-xs text-slate-300 leading-relaxed">
+            We'll send a confirmation email to <strong className="text-amber-400">{email}</strong>. Choose how you'd like to verify:
+          </p>
+          <div className="space-y-3 pt-1">
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleSelectVerificationMethod('link')}
+              className="w-full bg-[#2A2A2D] hover:bg-[#323236] border border-white/15 hover:border-[#F2B90C]/60 rounded-2xl p-4 text-left transition-all active:scale-[0.98] cursor-pointer group flex items-start gap-3.5"
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 border border-[#F2B90C]/30 text-[#F2B90C] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <ExternalLink className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-extrabold text-white group-hover:text-[#F2B90C] transition-colors">
+                    Send me a link
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-[#F2B90C] group-hover:translate-x-0.5 transition-all" />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                  Click the confirmation button in your email to verify instantly.
+                </p>
+              </div>
+            </button>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={() => handleSelectVerificationMethod('code')}
+              className="w-full bg-[#2A2A2D] hover:bg-[#323236] border border-white/15 hover:border-[#F2B90C]/60 rounded-2xl p-4 text-left transition-all active:scale-[0.98] cursor-pointer group flex items-start gap-3.5"
+            >
+              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Hash className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-extrabold text-white group-hover:text-amber-400 transition-colors">
+                    Send me a code
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                  Receive a 6-digit code in your email and type it in here.
+                </p>
+              </div>
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              setMode('signin');
-              setError(null);
-              setInfoMsg(null);
-            }}
-            className="w-full bg-[#F2B90C] hover:bg-[#d9a50a] text-[#0A0A0A] font-black py-3 rounded-full text-xs transition-all active:scale-95 cursor-pointer"
-          >
-            Back to Sign In
-          </button>
+          <div className="pt-2 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setMode('signin');
+                setError(null);
+                setInfoMsg(null);
+              }}
+              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
+            >
+              Back to Sign In
+            </button>
+          </div>
         </div>
       ) : mode === 'forgot_success' ? (
         <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-4 shadow-xl">

@@ -194,18 +194,30 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
   }
   try {
     const redirectUrl = `${window.location.origin}${window.location.pathname}`;
-    const { error } = await supabase.auth.resend({
+    console.log('====================================');
+    console.log('[SUPABASE AUTH RESEND CALL]');
+    console.log('Target Email:', email.trim());
+    console.log('Redirect URL:', redirectUrl);
+    
+    const { data, error } = await supabase.auth.resend({
       type: 'signup',
       email: email.trim(),
       options: {
         emailRedirectTo: redirectUrl,
       },
     });
+
+    console.log('[SUPABASE AUTH RESEND RESPONSE]');
+    console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('Error:', error);
+    console.log('====================================');
+
     if (error) {
       return { success: false, error: formatSupabaseAuthError(error, 'signup') };
     }
     return { success: true };
   } catch (err: any) {
+    console.error('[SUPABASE AUTH RESEND EXCEPTION]:', err);
     return { success: false, error: formatSupabaseAuthError(err, 'signup') };
   }
 }
@@ -218,16 +230,27 @@ export async function verifySignupOtp(email: string, token: string): Promise<{ s
     return { success: false, error: 'Supabase is not configured.' };
   }
   try {
+    console.log('====================================');
+    console.log('[SUPABASE AUTH VERIFY OTP CALL]');
+    console.log('Email:', email.trim(), 'Token:', token.trim());
+    
     const { data, error } = await supabase.auth.verifyOtp({
       email: email.trim(),
       token: token.trim(),
       type: 'signup',
     });
+
+    console.log('[SUPABASE AUTH VERIFY OTP RESPONSE]');
+    console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('Error:', error);
+    console.log('====================================');
+
     if (error) {
       return { success: false, error: formatSupabaseAuthError(error, 'signup') };
     }
     return { success: true, session: data.session };
   } catch (err: any) {
+    console.error('[SUPABASE AUTH VERIFY OTP EXCEPTION]:', err);
     return { success: false, error: formatSupabaseAuthError(err, 'signup') };
   }
 }
