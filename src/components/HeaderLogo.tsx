@@ -15,6 +15,7 @@ const WORDS = ['Learn.', 'Grow.', 'Archive.', 'BOARDLY'];
 export const HeaderLogo: React.FC<HeaderLogoProps> = ({
   onClick,
   subtitle,
+  size = 'lg',
   isIntro = true,
   currentUserEmail,
 }) => {
@@ -49,13 +50,15 @@ export const HeaderLogo: React.FC<HeaderLogoProps> = ({
 
   const currentWord = WORDS[wordIndex];
 
+  const badgeSizeClass = size === 'sm' ? 'w-9 h-9 p-0.5 rounded-xl' : size === 'md' ? 'w-12 h-12 p-1 rounded-2xl' : 'w-14 h-14 p-1 rounded-2xl';
+
   return (
     <div
       className="logo-wrap flex flex-col items-center justify-center mb-1.5 sm:mb-2 cursor-pointer group select-none"
       onClick={handleClick}
     >
       {/* Custom or Monogram Logo Image Badge */}
-      <div className="w-14 h-14 mb-2 rounded-2xl bg-[#0A0A0A] border-2 border-[#F2B90C]/40 p-1 shadow-[0_0_16px_rgba(242,185,12,0.25)] group-hover:shadow-[0_0_24px_rgba(242,185,12,0.5)] group-hover:border-[#F2B90C] group-hover:scale-105 transition-all duration-300 overflow-hidden flex items-center justify-center">
+      <div className={`${badgeSizeClass} mb-2 bg-[#0A0A0A] border-2 border-[#F2B90C]/40 shadow-[0_0_16px_rgba(242,185,12,0.25)] group-hover:shadow-[0_0_24px_rgba(242,185,12,0.5)] group-hover:border-[#F2B90C] group-hover:scale-105 transition-all duration-300 overflow-hidden flex items-center justify-center`}>
         <img
           src={logoUrl || "/logo.svg"}
           alt="Boardly Logo"

@@ -3255,38 +3255,68 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
   });
 
   // Gmail SMTP Email Setup
-  let mailTransporter: nodemailer.Transporter | null = null;
-  function getMailTransporter(): nodemailer.Transporter | null {
-    const emailUser = getEnvVar("EMAIL_USER");
-    const emailPass = getEnvVar("EMAIL_APP_PASSWORD");
-    if (!emailUser || !emailPass) {
-      return null;
+  function getMailCredentials() {
+    const user = (
+      getEnvVar("EMAIL_USER") ||
+      getEnvVar("GMAIL_USER") ||
+      getEnvVar("SMTP_USER") ||
+      getEnvVar("EMAIL_ADDRESS") ||
+      getEnvVar("VITE_EMAIL_USER") ||
+      ""
+    ).trim();
+    const pass = (
+      getEnvVar("EMAIL_APP_PASSWORD") ||
+      getEnvVar("GMAIL_APP_PASSWORD") ||
+      getEnvVar("GMAIL_PASS") ||
+      getEnvVar("SMTP_PASS") ||
+      getEnvVar("EMAIL_PASS") ||
+      getEnvVar("EMAIL_PASSWORD") ||
+      ""
+    ).trim();
+    return { user, pass };
+  }
+
+  function getMailTransporter(): { transporter: nodemailer.Transporter | null; user: string; error?: string } {
+    const { user, pass } = getMailCredentials();
+    if (!user || !pass) {
+      const missingKeys = [];
+      if (!user) missingKeys.push("EMAIL_USER/GMAIL_USER/SMTP_USER");
+      if (!pass) missingKeys.push("EMAIL_APP_PASSWORD/GMAIL_APP_PASSWORD/GMAIL_PASS/SMTP_PASS");
+      return {
+        transporter: null,
+        user: "",
+        error: `Missing environment variable(s): ${missingKeys.join(", ")}. Please set EMAIL_USER and EMAIL_APP_PASSWORD in environment variables.`,
+      };
     }
-    if (!mailTransporter) {
-      mailTransporter = nodemailer.createTransport({
+
+    try {
+      const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: emailUser,
-          pass: emailPass,
+          user,
+          pass,
         },
       });
+      return { transporter, user };
+    } catch (err: any) {
+      console.error("[getMailTransporter Exception]:", err);
+      return { transporter: null, user, error: err?.message || "Failed to initialize Nodemailer transporter." };
     }
-    return mailTransporter;
   }
 
   async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }): Promise<{ success: boolean; id?: string; error?: string }> {
+    console.log(`[sendEmail Initiated] Target: ${to} | Subject: "${subject}"`);
     try {
-      const transporter = getMailTransporter();
-      if (!transporter) {
-        const emailUser = getEnvVar("EMAIL_USER");
-        const emailPass = getEnvVar("EMAIL_APP_PASSWORD");
-        console.log(`[Gmail SMTP Config Warning] EMAIL_USER: ${emailUser ? "Set" : "Missing"}, EMAIL_APP_PASSWORD: ${emailPass ? "Set" : "Missing"}`);
-        console.log(`[Email Mock / Credentials Missing] To: ${to} | Subject: ${subject}`);
-        return { success: true, id: "mock_gmail_disabled" };
+      const { transporter, user, error: configError } = getMailTransporter();
+      if (!transporter || configError) {
+        console.error(`[sendEmail ERROR - Credentials Missing/Invalid]: ${configError}`);
+        return { success: false, error: configError || "Gmail SMTP credentials not configured." };
       }
-      const fromUser = getEnvVar("EMAIL_USER");
+
       const fromName = getEnvVar("EMAIL_FROM_NAME", "Boardly Support");
-      const from = `"${fromName}" <${fromUser}>`;
+      const from = `"${fromName}" <${user}>`;
+
+      console.log(`[sendEmail SMTP Sending] From: ${from} -> To: ${to}`);
 
       const info = await transporter.sendMail({
         from,
@@ -3294,11 +3324,13 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         subject,
         html,
       });
-      console.log(`[Gmail SMTP Email Sent Successfully] Message ID: ${info.messageId} | To: ${to}`);
+
+      console.log(`[sendEmail SUCCESS] Message ID: ${info.messageId} | Response: ${info.response || 'OK'} | To: ${to}`);
       return { success: true, id: info.messageId };
     } catch (err: any) {
-      console.error("[sendEmail Exception (Gmail SMTP)]:", err);
-      return { success: false, error: err?.message || "Email dispatch failed." };
+      console.error(`[sendEmail EXCEPTION (Gmail SMTP Failure)] To: ${to}:`, err);
+      const errorMessage = err?.message || String(err);
+      return { success: false, error: `Gmail SMTP Send Failed: ${errorMessage}` };
     }
   }
 
@@ -3734,11 +3766,16 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         date: new Date().toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' }),
       });
 
+      console.log(`[api/payment-requests/submit] Sending student confirmation email to: ${newRecord.student_email}...`);
       const studentEmailRes = await sendEmail({
         to: newRecord.student_email,
         subject: "Payment Proof Received - Boardly Premium Access",
         html: studentEmailHtml,
       });
+
+      if (!studentEmailRes.success) {
+        console.error(`[api/payment-requests/submit] Student email failed for ${newRecord.student_email}:`, studentEmailRes.error);
+      }
 
       // 2) Send Admin Notification Email
       const adminEmailHtml = generateAdminPaymentNotificationEmail({
@@ -3751,11 +3788,16 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         driveUrl: driveFileUrl,
       });
 
+      console.log(`[api/payment-requests/submit] Sending admin notification email to: shsvirtualadmin@gmail.com...`);
       const adminEmailRes = await sendEmail({
         to: "shsvirtualadmin@gmail.com",
         subject: `[NEW PAYMENT PROOF] ${newRecord.student_name} (${newRecord.student_email})`,
         html: adminEmailHtml,
       });
+
+      if (!adminEmailRes.success) {
+        console.error(`[api/payment-requests/submit] Admin notification email failed:`, adminEmailRes.error);
+      }
 
       return res.status(200).json({
         success: true,
@@ -3764,6 +3806,8 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         emailsSent: {
           student: studentEmailRes.success,
           admin: adminEmailRes.success,
+          studentError: studentEmailRes.error || null,
+          adminError: adminEmailRes.error || null,
         }
       });
     } catch (err: any) {

@@ -1841,7 +1841,12 @@ export interface PaymentRequest {
 /**
  * Submit payment proof to backend (uploads screenshot to Drive and records request in DB)
  */
-export async function submitPaymentProofApi(formData: FormData): Promise<{ success: boolean; data?: PaymentRequest; error?: string }> {
+export async function submitPaymentProofApi(formData: FormData): Promise<{
+  success: boolean;
+  data?: PaymentRequest;
+  error?: string;
+  emailsSent?: { student: boolean; admin: boolean; studentError?: string | null; adminError?: string | null };
+}> {
   try {
     const resp = await apiFetch('/api/payment-requests/submit', {
       method: 'POST',
@@ -1849,7 +1854,7 @@ export async function submitPaymentProofApi(formData: FormData): Promise<{ succe
     });
     const result = await safeJsonResponse(resp);
     if (resp.ok && result && result.success) {
-      return { success: true, data: result.data };
+      return { success: true, data: result.data, emailsSent: result.emailsSent };
     }
 
     const errorMessage = result?.error || result?.message || `Payment submission server error (Status ${resp.status})`;

@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import nodemailer from "nodemailer";
 import { getGoogleAccessToken } from "../../_utils/googleAuth.js";
 
 interface PagesContext {
@@ -174,8 +175,122 @@ const handleSubmitPaymentRequest = async (context: PagesContext) => {
       }
     }
 
+    // Send confirmation email to student and notification to admin
+    const emailUser = (
+      env.EMAIL_USER ||
+      env.GMAIL_USER ||
+      env.SMTP_USER ||
+      env.EMAIL_ADDRESS ||
+      env.VITE_EMAIL_USER ||
+      (typeof process !== "undefined" ? process.env?.EMAIL_USER || process.env?.GMAIL_USER : "") ||
+      ""
+    ).trim();
+
+    const emailPass = (
+      env.EMAIL_APP_PASSWORD ||
+      env.GMAIL_APP_PASSWORD ||
+      env.GMAIL_PASS ||
+      env.SMTP_PASS ||
+      env.EMAIL_PASS ||
+      env.EMAIL_PASSWORD ||
+      (typeof process !== "undefined" ? process.env?.EMAIL_APP_PASSWORD || process.env?.GMAIL_APP_PASSWORD : "") ||
+      ""
+    ).trim();
+
+    let studentEmailSent = false;
+    let adminEmailSent = false;
+    let studentEmailErr: string | null = null;
+    let adminEmailErr: string | null = null;
+
+    if (emailUser && emailPass) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: { user: emailUser, pass: emailPass },
+        });
+
+        const fromName = env.EMAIL_FROM_NAME || "Boardly Support";
+        const from = `"${fromName}" <${emailUser}>`;
+
+        // 1) Student Confirmation Email
+        const studentHtml = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded-radius: 12px;">
+            <h2 style="color: #059669;">Payment Proof Received - Boardly Premium</h2>
+            <p>Dear ${student_name},</p>
+            <p>We have successfully received your payment proof screenshot for <strong>${payment_method}</strong> (Amount: <strong>PKR ${amount}</strong>).</p>
+            <p>Our administration team is reviewing your transaction and will activate your full access shortly.</p>
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
+            <p style="font-size: 12px; color: #64748b;">Boardly Learning Platform &copy; ${new Date().getFullYear()}</p>
+          </div>
+        `;
+
+        const studentRes = await transporter.sendMail({
+          from,
+          to: student_email,
+          subject: "Payment Proof Received - Boardly Premium Access",
+          html: studentHtml,
+        });
+        studentEmailSent = true;
+        console.log(`[Cloudflare Function Email Sent to Student]: Message ID ${studentRes.messageId}`);
+      } catch (sErr: any) {
+        studentEmailErr = sErr?.message || String(sErr);
+        console.error(`[Cloudflare Function Student Email Failed]:`, sErr);
+      }
+
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: { user: emailUser, pass: emailPass },
+        });
+
+        const fromName = env.EMAIL_FROM_NAME || "Boardly Support";
+        const from = `"${fromName}" <${emailUser}>`;
+
+        // 2) Admin Notification Email
+        const adminHtml = `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; rounded-radius: 12px;">
+            <h2 style="color: #0f172a;">New Payment Proof Submission</h2>
+            <p><strong>Student:</strong> ${student_name} (${student_email})</p>
+            <p><strong>Method:</strong> ${payment_method}</p>
+            <p><strong>Amount:</strong> PKR ${amount}</p>
+            <p><strong>Transaction Ref:</strong> ${transaction_reference || 'N/A'}</p>
+            <p><strong>Drive Proof URL:</strong> <a href="${driveFileUrl}">${driveFileUrl}</a></p>
+          </div>
+        `;
+
+        const adminRes = await transporter.sendMail({
+          from,
+          to: "shsvirtualadmin@gmail.com",
+          subject: `[NEW PAYMENT PROOF] ${student_name} (${student_email})`,
+          html: adminHtml,
+        });
+        adminEmailSent = true;
+        console.log(`[Cloudflare Function Email Sent to Admin]: Message ID ${adminRes.messageId}`);
+      } catch (aErr: any) {
+        adminEmailErr = aErr?.message || String(aErr);
+        console.error(`[Cloudflare Function Admin Email Failed]:`, aErr);
+      }
+    } else {
+      const missingKeys = [];
+      if (!emailUser) missingKeys.push("EMAIL_USER/GMAIL_USER");
+      if (!emailPass) missingKeys.push("EMAIL_APP_PASSWORD/GMAIL_APP_PASSWORD");
+      studentEmailErr = `Gmail SMTP credentials missing on server (${missingKeys.join(", ")}).`;
+      adminEmailErr = studentEmailErr;
+      console.warn(`[Cloudflare Function Email Warning] Cannot send welcome email: ${studentEmailErr}`);
+    }
+
     return new Response(
-      JSON.stringify({ success: true, data: insertedData }),
+      JSON.stringify({
+        success: true,
+        data: insertedData,
+        driveFileUrl,
+        emailsSent: {
+          student: studentEmailSent,
+          admin: adminEmailSent,
+          studentError: studentEmailErr,
+          adminError: adminEmailErr,
+        }
+      }),
       { status: 200, headers: corsHeaders }
     );
   } catch (err: any) {
