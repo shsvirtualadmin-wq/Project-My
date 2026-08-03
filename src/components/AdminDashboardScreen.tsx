@@ -1069,12 +1069,13 @@ CREATE POLICY "Admin full access study_buddy_history" ON public.study_buddy_hist
             <div className="flex items-center gap-2.5 min-w-0">
               <div className="w-8 h-8 rounded-xl bg-[#0A0A0A] border border-[#F2B90C]/40 p-0.5 flex items-center justify-center shrink-0 shadow-sm overflow-hidden">
                 <img
-                  src="/logo.png"
+                  src="/logo.svg"
                   alt="Boardly Logo"
                   className="w-full h-full object-contain"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = '/logo.png';
+                    target.onerror = null;
+                    target.src = '/boardly-logo.svg';
                   }}
                 />
               </div>

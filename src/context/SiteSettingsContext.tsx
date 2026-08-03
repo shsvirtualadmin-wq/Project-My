@@ -6,23 +6,23 @@ interface SiteSettingsContextType {
 }
 
 const SiteSettingsContext = createContext<SiteSettingsContextType>({
-  logoUrl: '/logo.png',
+  logoUrl: '/logo.svg',
   refreshSiteSettings: async () => {},
 });
 
 export const SiteSettingsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [logoUrl] = useState<string | null>('/logo.png');
+  const [logoUrl] = useState<string | null>('/logo.svg');
 
   // Maintain favicon setting
   useEffect(() => {
     try {
       const link: HTMLLinkElement | null = document.querySelector("link[rel*='icon']");
       if (link) {
-        link.href = '/logo.png';
+        link.href = '/logo.svg';
       } else {
         const newLink = document.createElement('link');
         newLink.rel = 'icon';
-        newLink.href = '/logo.png';
+        newLink.href = '/logo.svg';
         document.head.appendChild(newLink);
       }
     } catch (e) {

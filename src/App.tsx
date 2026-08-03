@@ -1958,12 +1958,13 @@ export function App() {
               <div className="w-16 h-16 rounded-full border-4 border-[#F2B90C]/20 border-t-[#F2B90C] animate-spin" />
               <div className="w-8 h-8 absolute rounded-full overflow-hidden p-0.5 bg-[#0A0A0A] border border-[#F2B90C]/40 flex items-center justify-center shadow-sm">
                 <img
-                  src="/logo.png"
+                  src="/logo.svg"
                   alt="Boardly Logo"
                   className="w-full h-full object-contain"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement;
-                    target.src = '/logo.png';
+                    target.onerror = null;
+                    target.src = '/boardly-logo.svg';
                   }}
                 />
               </div>

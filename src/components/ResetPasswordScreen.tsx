@@ -182,12 +182,13 @@ export const ResetPasswordScreen: React.FC<ResetPasswordScreenProps> = ({ onNavi
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-slate-900/80 border border-[#F2B90C]/30 mb-4 shadow-lg p-2.5">
             <img
-              src={logoUrl || "/logo.png"}
+              src={logoUrl || "/logo.svg"}
               alt="Boardly Logo"
               className="w-full h-full object-contain"
               onError={(e) => {
                 const target = e.target as HTMLImageElement;
-                target.src = '/logo.png';
+                target.onerror = null;
+                target.src = '/boardly-logo.svg';
               }}
             />
           </div>

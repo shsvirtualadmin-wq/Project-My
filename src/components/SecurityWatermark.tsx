@@ -31,7 +31,7 @@ export const SecurityWatermark: React.FC<SecurityWatermarkProps> = ({ currentUse
       <div
         className="absolute inset-0 opacity-[0.05] dark:opacity-[0.08] bg-repeat bg-[length:140px_140px]"
         style={{
-          backgroundImage: `url('${logoUrl || '/logo.png'}')`,
+          backgroundImage: `url('${logoUrl || '/logo.svg'}')`,
           backgroundPosition: 'center',
         }}
       />
@@ -39,12 +39,13 @@ export const SecurityWatermark: React.FC<SecurityWatermarkProps> = ({ currentUse
       {/* Layer 2: Large Subtle Central Emblem Watermark (~6-10% opacity) */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 sm:w-96 sm:h-96 opacity-[0.07] dark:opacity-[0.10] flex items-center justify-center pointer-events-none">
         <img
-          src={logoUrl || '/logo.png'}
+          src={logoUrl || '/logo.svg'}
           alt=""
           className="w-full h-full object-contain select-none"
           onError={(e) => {
             const target = e.target as HTMLImageElement;
-            target.src = '/logo.png';
+            target.onerror = null;
+            target.src = '/boardly-logo.svg';
           }}
         />
       </div>
