@@ -163,6 +163,12 @@ function cleanAuthMessage(msg: string, context?: 'signup' | 'signin'): string {
   if (lower.includes('rate limit') || lower.includes('too many requests') || lower.includes('over_email_send_rate_limit')) {
     return 'Rate limit exceeded. Please wait a few minutes before trying again.';
   }
+  if (lower.includes('token has expired') || lower.includes('otp_expired') || lower.includes('token expired') || lower.includes('code has expired')) {
+    return 'Verification code has expired. Please click "Resend Code" to receive a new code.';
+  }
+  if (lower.includes('invalid token') || lower.includes('token is invalid') || lower.includes('invalid otp') || lower.includes('token not found')) {
+    return 'Invalid verification code. Please check the 6 digits and try again.';
+  }
   if (lower.includes('email not confirmed')) {
     return 'Email address not confirmed yet. Please check your inbox for the confirmation link.';
   }
@@ -177,6 +183,53 @@ function cleanAuthMessage(msg: string, context?: 'signup' | 'signin'): string {
   }
 
   return msg;
+}
+
+/**
+ * Resends the signup confirmation email to the specified email address.
+ */
+export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: 'Supabase is not configured.' };
+  }
+  try {
+    const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: email.trim(),
+      options: {
+        emailRedirectTo: redirectUrl,
+      },
+    });
+    if (error) {
+      return { success: false, error: formatSupabaseAuthError(error, 'signup') };
+    }
+    return { success: true };
+  } catch (err: any) {
+    return { success: false, error: formatSupabaseAuthError(err, 'signup') };
+  }
+}
+
+/**
+ * Verifies a 6-digit OTP code sent during signup confirmation.
+ */
+export async function verifySignupOtp(email: string, token: string): Promise<{ success: boolean; session?: any; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: 'Supabase is not configured.' };
+  }
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email.trim(),
+      token: token.trim(),
+      type: 'signup',
+    });
+    if (error) {
+      return { success: false, error: formatSupabaseAuthError(error, 'signup') };
+    }
+    return { success: true, session: data.session };
+  } catch (err: any) {
+    return { success: false, error: formatSupabaseAuthError(err, 'signup') };
+  }
 }
 
 export interface StudentProfile {
@@ -1841,12 +1894,7 @@ export interface PaymentRequest {
 /**
  * Submit payment proof to backend (uploads screenshot to Drive and records request in DB)
  */
-export async function submitPaymentProofApi(formData: FormData): Promise<{
-  success: boolean;
-  data?: PaymentRequest;
-  error?: string;
-  emailsSent?: { student: boolean; admin: boolean; studentError?: string | null; adminError?: string | null };
-}> {
+export async function submitPaymentProofApi(formData: FormData): Promise<{ success: boolean; data?: PaymentRequest; error?: string }> {
   try {
     const resp = await apiFetch('/api/payment-requests/submit', {
       method: 'POST',
@@ -1854,7 +1902,7 @@ export async function submitPaymentProofApi(formData: FormData): Promise<{
     });
     const result = await safeJsonResponse(resp);
     if (resp.ok && result && result.success) {
-      return { success: true, data: result.data, emailsSent: result.emailsSent };
+      return { success: true, data: result.data };
     }
 
     const errorMessage = result?.error || result?.message || `Payment submission server error (Status ${resp.status})`;

@@ -14,7 +14,6 @@ import {
   Image as ImageIcon,
   ArrowRight,
   ShieldCheck,
-  AlertTriangle,
 } from 'lucide-react';
 import { StudentProfile, User, submitPaymentProofApi, PaymentRequest } from '../lib/supabase';
 
@@ -110,7 +109,6 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
   const [submittedData, setSubmittedData] = useState<PaymentRequest | null>(null);
-  const [emailStatus, setEmailStatus] = useState<{ student: boolean; error?: string | null } | null>(null);
 
   if (!isOpen) return null;
 
@@ -210,11 +208,6 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
       if (res.success && res.data) {
         setIsSuccess(true);
         setSubmittedData(res.data);
-        if (res.emailsSent) {
-          setEmailStatus({ student: res.emailsSent.student, error: res.emailsSent.studentError });
-        } else {
-          setEmailStatus({ student: false, error: 'Email dispatch component not configured.' });
-        }
         if (onSubmitted) onSubmitted(res.data);
       } else {
         const errorMsg = res.error || 'Failed to submit payment proof. Please try again.';
@@ -297,24 +290,9 @@ export const PaymentProofModal: React.FC<PaymentProofModalProps> = ({
                 </div>
               )}
 
-              {emailStatus?.student ? (
-                <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-xs text-emerald-800 dark:text-emerald-300 max-w-md mx-auto text-left">
-                  📧 A welcome confirmation email has been dispatched to <strong>{submittedData?.student_email || currentUser?.email}</strong>.
-                </div>
-              ) : (
-                <div className="p-4 bg-amber-500/10 border border-amber-500/20 rounded-2xl text-xs text-amber-900 dark:text-amber-200 max-w-md mx-auto text-left space-y-1">
-                  <div className="font-bold flex items-center gap-1.5 text-amber-800 dark:text-amber-300">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" />
-                    <span>Email Confirmation Delivery Failed</span>
-                  </div>
-                  <p className="text-[11px] leading-relaxed opacity-90">
-                    Your payment proof was recorded, but the confirmation email could not be delivered to <strong>{submittedData?.student_email || currentUser?.email}</strong>.
-                  </p>
-                  <p className="text-[10px] font-mono bg-amber-500/15 p-1.5 rounded text-amber-950 dark:text-amber-100 mt-1 break-all">
-                    {emailStatus?.error || "Gmail SMTP credentials (EMAIL_USER & EMAIL_APP_PASSWORD) are missing on the server."}
-                  </p>
-                </div>
-              )}
+              <div className="p-4 bg-blue-500/10 border border-blue-500/20 rounded-2xl text-xs text-blue-700 dark:text-blue-300 max-w-md mx-auto">
+                📧 A welcome confirmation email has been sent to <strong>{submittedData?.student_email || currentUser?.email}</strong>.
+              </div>
 
               <button
                 onClick={onClose}
