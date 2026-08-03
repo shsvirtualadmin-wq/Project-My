@@ -48,7 +48,7 @@ import { PaymentRequiredScreen } from './components/PaymentRequiredScreen';
 import { PaymentProofModal } from './components/PaymentProofModal';
 import { PlanSelectionScreen, PlanId, PLAN_OPTIONS } from './components/PlanSelectionScreen';
 import { ResetPasswordScreen } from './components/ResetPasswordScreen';
-import { supabase, apiFetch, safeJsonResponse, syncUserProfile, saveTestToSupabase, fetchUserTestHistoryFromSupabase, clearUserTestHistoryInSupabase, fetchStudentProfileFromSupabase, fetchStudentMcqUsage, clearProfileCache, checkUserExistsInDatabase, isStudentExistingBeforeRule, isAdminEmail, User, StudentProfile } from './lib/supabase';
+import { supabase, apiFetch, safeJsonResponse, syncUserProfile, saveTestToSupabase, fetchUserTestHistoryFromSupabase, clearUserTestHistoryInSupabase, fetchStudentProfileFromSupabase, fetchStudentMcqUsage, clearProfileCache, checkUserExistsInDatabase, isStudentExistingBeforeRule, isAdminEmail, verifyEmailTokenHash, User, StudentProfile } from './lib/supabase';
 import { App as CapacitorApp } from '@capacitor/app';
 import { ShieldCheck, Sun, Moon, WifiOff, AlertTriangle, Lock, ShieldAlert, GraduationCap, Sparkles, ArrowRight } from 'lucide-react';
 import { cacheGeneratedQuestions, getCachedQuestions, saveHistoryOffline, loadHistoryOffline, clearHistoryOffline } from './lib/offlineCache';
@@ -121,11 +121,25 @@ const getInitialUrlState = (): {
   if (
     window.location.pathname.includes('/reset-password') ||
     window.location.search.includes('type=recovery') ||
-    window.location.hash.includes('type=recovery') ||
+    window.location.hash.includes('type=recovery')
+  ) {
+    return { screen: 'reset_password', selectedSubject: 'Urdu' };
+  }
+
+  // Check if URL contains email confirmation tokens or auth callback parameters
+  if (
+    window.location.search.includes('token_hash=') ||
+    window.location.hash.includes('token_hash=') ||
+    window.location.search.includes('code=') ||
+    window.location.hash.includes('access_token=') ||
+    window.location.search.includes('type=signup') ||
+    window.location.hash.includes('type=signup') ||
+    window.location.search.includes('type=email') ||
+    window.location.hash.includes('type=email') ||
     window.location.search.includes('error=') ||
     window.location.hash.includes('error=')
   ) {
-    return { screen: 'reset_password', selectedSubject: 'Urdu' };
+    return { screen: 'auth', selectedSubject: 'Urdu' };
   }
 
   const params = new URLSearchParams(window.location.search);
@@ -757,6 +771,66 @@ export function App() {
 
   useEffect(() => {
     let isSubscribed = true;
+
+    // 0. Explicit Email Confirmation Link & Callback URL Diagnostics
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash);
+
+    const tokenHash = searchParams.get('token_hash') || hashParams.get('token_hash');
+    const codeParam = searchParams.get('code') || hashParams.get('code');
+    const authType = searchParams.get('type') || hashParams.get('type');
+    const accessToken = hashParams.get('access_token');
+    const urlError = searchParams.get('error') || hashParams.get('error');
+    const urlErrorDescription = searchParams.get('error_description') || hashParams.get('error_description');
+
+    if (tokenHash || codeParam || authType || accessToken || urlError || urlErrorDescription) {
+      console.log('====================================');
+      console.log('[SUPABASE AUTH EMAIL CONFIRMATION CALLBACK DETECTED]');
+      console.log('Full URL:', window.location.href);
+      console.log('Pathname:', window.location.pathname);
+      console.log('Search:', window.location.search);
+      console.log('Hash:', window.location.hash);
+      console.log('Parsed Parameters:', {
+        token_hash: tokenHash,
+        code: codeParam,
+        type: authType,
+        access_token_present: Boolean(accessToken),
+        error: urlError,
+        error_description: urlErrorDescription,
+      });
+      console.log('====================================');
+
+      if (tokenHash) {
+        console.log('[Auth Callback] Verifying token_hash with Supabase verifyOtp...');
+        verifyEmailTokenHash(tokenHash, authType || 'signup').then((res) => {
+          console.log('[Auth Callback] token_hash verification result:', res);
+          if (res.success && res.session?.user) {
+            console.log('[Auth Callback] Verification success! User session set:', res.session.user.email);
+            setCurrentUser(res.session.user);
+            window.history.replaceState(null, '', window.location.pathname);
+          } else if (res.error) {
+            console.error('[Auth Callback] token_hash verification error:', res.error);
+            setScreen('auth');
+          }
+        });
+      } else if (codeParam) {
+        console.log('[Auth Callback] Exchanging code for session with Supabase...');
+        supabase.auth.exchangeCodeForSession(codeParam).then(({ data, error }) => {
+          console.log('[Auth Callback] Code exchange result:', { data, error });
+          if (!error && data?.session?.user) {
+            console.log('[Auth Callback] Code exchange success! User session set:', data.session.user.email);
+            setCurrentUser(data.session.user);
+            window.history.replaceState(null, '', window.location.pathname);
+          } else if (error) {
+            console.error('[Auth Callback] Code exchange error:', error);
+            setScreen('auth');
+          }
+        });
+      } else if (urlError || urlErrorDescription) {
+        console.error('[Auth Callback] URL contains Auth Error:', urlErrorDescription || urlError);
+        setScreen('auth');
+      }
+    }
 
     const processAuthUser = async (user: User, sourceEvent: string) => {
       console.log(`[Supabase Auth Log] Processing user session (Source: ${sourceEvent}):`, {

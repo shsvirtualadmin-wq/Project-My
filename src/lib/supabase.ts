@@ -255,6 +255,39 @@ export async function verifySignupOtp(email: string, token: string): Promise<{ s
   }
 }
 
+/**
+ * Verifies an email confirmation token_hash sent in Supabase confirmation links.
+ */
+export async function verifyEmailTokenHash(tokenHash: string, type: any = 'signup'): Promise<{ success: boolean; session?: any; error?: string }> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: 'Supabase is not configured.' };
+  }
+  try {
+    console.log('====================================');
+    console.log('[SUPABASE AUTH VERIFY TOKEN_HASH CALL]');
+    console.log('Token Hash:', tokenHash);
+    console.log('Verification Type:', type);
+    
+    const { data, error } = await supabase.auth.verifyOtp({
+      token_hash: tokenHash,
+      type: type || 'signup',
+    });
+
+    console.log('[SUPABASE AUTH VERIFY TOKEN_HASH RESPONSE]');
+    console.log('Data:', JSON.stringify(data, null, 2));
+    console.log('Error:', error);
+    console.log('====================================');
+
+    if (error) {
+      return { success: false, error: formatSupabaseAuthError(error, 'signup') };
+    }
+    return { success: true, session: data.session };
+  } catch (err: any) {
+    console.error('[SUPABASE AUTH VERIFY TOKEN_HASH EXCEPTION]:', err);
+    return { success: false, error: formatSupabaseAuthError(err, 'signup') };
+  }
+}
+
 export interface StudentProfile {
   id: string;
   name: string;
