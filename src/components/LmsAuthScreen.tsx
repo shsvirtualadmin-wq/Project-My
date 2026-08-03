@@ -303,7 +303,15 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
   // Select Verification Method from choice screen
   const handleSelectVerificationMethod = async (method: 'link' | 'code') => {
     const trimmedEmail = email.trim();
+    console.log('====================================');
+    console.log('[SELECT VERIFICATION METHOD CLICKED]');
+    console.log('Method:', method);
+    console.log('Email variable value:', `"${email}"`);
+    console.log('Trimmed Email value:', `"${trimmedEmail}"`);
+    console.log('====================================');
+
     if (!trimmedEmail) {
+      console.error('[SELECT VERIFICATION METHOD ERROR]: Email is empty or undefined!');
       setError('Missing email address. Please try signing up again.');
       return;
     }
@@ -313,7 +321,10 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
     setInfoMsg(null);
 
     try {
+      console.log('[SELECT VERIFICATION METHOD] Calling resendVerificationEmail...');
       const res = await resendVerificationEmail(trimmedEmail);
+      console.log('[SELECT VERIFICATION METHOD] resendVerificationEmail Result:', res);
+
       if (!res.success) {
         setError(res.error || 'Failed to send verification email. Please try again.');
         return;
@@ -338,7 +349,15 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
   // Switch Verification Method from link to code or code to link
   const handleSwitchVerificationMethod = async (targetMethod: 'link' | 'code') => {
     const trimmedEmail = email.trim();
+    console.log('====================================');
+    console.log('[SWITCH VERIFICATION METHOD CLICKED]');
+    console.log('Target Method:', targetMethod);
+    console.log('Email variable value:', `"${email}"`);
+    console.log('Trimmed Email value:', `"${trimmedEmail}"`);
+    console.log('====================================');
+
     if (!trimmedEmail) {
+      console.error('[SWITCH VERIFICATION METHOD ERROR]: Email is empty or undefined!');
       setError('Missing email address. Please try signing up again.');
       return;
     }
@@ -348,7 +367,10 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
     setInfoMsg(null);
 
     try {
+      console.log('[SWITCH VERIFICATION METHOD] Calling resendVerificationEmail...');
       const res = await resendVerificationEmail(trimmedEmail);
+      console.log('[SWITCH VERIFICATION METHOD] resendVerificationEmail Result:', res);
+
       if (!res.success) {
         setError(res.error || 'Failed to resend verification email.');
         return;
@@ -373,7 +395,15 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
   // Resend email on current method screen
   const handleResendSameMethod = async (currentMethod: 'link' | 'code') => {
     const trimmedEmail = email.trim();
+    console.log('====================================');
+    console.log('[RESEND BUTTON CLICKED]');
+    console.log('Current Method:', currentMethod);
+    console.log('Email variable value:', `"${email}"`);
+    console.log('Trimmed Email value:', `"${trimmedEmail}"`);
+    console.log('====================================');
+
     if (!trimmedEmail) {
+      console.error('[RESEND BUTTON ERROR]: Email is empty or undefined!');
       setError('Missing email address. Please try signing up again.');
       return;
     }
@@ -383,7 +413,10 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
     setInfoMsg(null);
 
     try {
+      console.log('[RESEND BUTTON] Calling resendVerificationEmail...');
       const res = await resendVerificationEmail(trimmedEmail);
+      console.log('[RESEND BUTTON] resendVerificationEmail Result:', res);
+
       if (!res.success) {
         setError(res.error || 'Failed to resend verification email.');
         return;
