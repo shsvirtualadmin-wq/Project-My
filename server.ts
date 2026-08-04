@@ -3307,6 +3307,12 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         console.log("[getMailTransporter] Initializing Nodemailer with Gmail OAuth2 transport...");
         mailTransporter = nodemailer.createTransport({
           service: "gmail",
+          pool: true,
+          maxConnections: 5,
+          maxMessages: 100,
+          connectionTimeout: 10000,
+          greetingTimeout: 5000,
+          socketTimeout: 15000,
           auth: {
             type: "OAuth2",
             user: config.emailUser,
@@ -3320,6 +3326,12 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         console.log("[getMailTransporter] Initializing Nodemailer with Gmail App Password transport...");
         mailTransporter = nodemailer.createTransport({
           service: "gmail",
+          pool: true,
+          maxConnections: 5,
+          maxMessages: 100,
+          connectionTimeout: 10000,
+          greetingTimeout: 5000,
+          socketTimeout: 15000,
           auth: {
             user: config.emailUser,
             pass: config.emailPass,
@@ -3331,6 +3343,16 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     return mailTransporter;
   }
 
+  // In-memory store for 6-digit verification codes
+  const inMemoryVerificationCodes = new Map<string, { code: string; expiresAt: number }>();
+
+  // Standardized 6-Digit Code Generator
+  // BEFORE FIX: const verificationCode = Math.floor(10000000 + Math.random() * 90000000).toString(); // 8 digit
+  // AFTER FIX:  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit
+  function generate6DigitCode(): string {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  }
+
   async function sendEmail({
     to,
     subject,
@@ -3339,7 +3361,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     to: string;
     subject: string;
     html: string;
-  }): Promise<{ success: boolean; id?: string; error?: string; details?: any }> {
+  }): Promise<{ success: boolean; id?: string; durationMs?: number; error?: string; details?: any }> {
     console.log("====================================");
     console.log("[SEND EMAIL INVOKED]");
     console.log(`Recipient (To): ${to}`);
@@ -3369,8 +3391,10 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       console.log(`✅ [From Address Verification] Passed — From address matches authenticated user (${config.emailUser}).`);
     }
 
+    const startTime = Date.now();
+    console.log(`⏱️ [SMTP Timings Start] Dispatching email via Nodemailer to ${to} at ${new Date(startTime).toISOString()}`);
+
     try {
-      console.log(`[sendEmail] Attempting to dispatch email via Nodemailer to ${to}...`);
       const info = await transporter.sendMail({
         from: fromAddress,
         to,
@@ -3378,17 +3402,24 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         html,
       });
 
+      const endTime = Date.now();
+      const durationMs = endTime - startTime;
+
       console.log("✅ [Gmail SMTP Email Sent Successfully]");
+      console.log(`⏱️ [SMTP Timings End] Completed email dispatch to ${to} in ${durationMs}ms (${(durationMs / 1000).toFixed(2)}s)`);
       console.log(`Message ID: ${info.messageId}`);
       console.log(`Accepted: ${JSON.stringify(info.accepted)}`);
       console.log(`Rejected: ${JSON.stringify(info.rejected)}`);
       console.log(`Response: ${info.response}`);
       console.log("====================================");
 
-      return { success: true, id: info.messageId, details: info };
+      return { success: true, id: info.messageId, durationMs, details: info };
     } catch (err: any) {
+      const endTime = Date.now();
+      const durationMs = endTime - startTime;
+
       console.error("====================================");
-      console.error("❌ [sendEmail EXCEPTION (Gmail SMTP / API Failure)]");
+      console.error(`❌ [sendEmail EXCEPTION after ${durationMs}ms (${(durationMs / 1000).toFixed(2)}s)]`);
       console.error(`Error Message: ${err?.message}`);
       console.error(`Error Code: ${err?.code || "N/A"}`);
       console.error(`Error Command: ${err?.command || "N/A"}`);
@@ -3402,13 +3433,13 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       let userFriendlyError = err?.message || "Email dispatch failed.";
 
       if (err?.message?.includes("invalid_grant") || err?.message?.includes("Invalid Credentials") || err?.code === "EAUTH") {
-        userFriendlyError = `Authentication failed for ${config.emailUser}. If using OAuth2, the refresh token may have expired or been revoked (common if the GCP OAuth app is in 'Testing' mode where refresh tokens expire after 7 days). If using an App Password, ensure 2FA is enabled and a fresh 16-character Gmail App Password is set without spaces.`;
+        userFriendlyError = `Authentication failed for ${config.emailUser}. If using OAuth2, the refresh token may have expired or been revoked. If using an App Password, ensure 2FA is enabled and a fresh 16-character Gmail App Password is set.`;
         console.error(`🔍 [DIAGNOSTIC HINT]: ${userFriendlyError}`);
       } else if (err?.responseCode === 535 || err?.message?.includes("535 5.7.8")) {
-        userFriendlyError = `Gmail SMTP Auth Failed (535 5.7.8). Please check your EMAIL_USER (${config.emailUser}) and EMAIL_APP_PASSWORD. Note: Your regular Gmail password will NOT work; you must generate a 16-character App Password at https://myaccount.google.com/apppasswords.`;
+        userFriendlyError = `Gmail SMTP Auth Failed (535 5.7.8). Please check your EMAIL_USER (${config.emailUser}) and EMAIL_APP_PASSWORD.`;
         console.error(`🔍 [DIAGNOSTIC HINT]: ${userFriendlyError}`);
       } else if (err?.responseCode === 550 || err?.message?.includes("quota") || err?.message?.includes("Rate limit")) {
-        userFriendlyError = `Gmail sending quota exceeded or recipient address rejected (${config.emailUser}). Gmail free accounts have a limit of 500 emails/day.`;
+        userFriendlyError = `Gmail sending quota exceeded or recipient address rejected (${config.emailUser}).`;
         console.error(`🔍 [DIAGNOSTIC HINT]: ${userFriendlyError}`);
       } else if (err?.code === "ESOCKET" || err?.code === "ETIMEDOUT" || err?.code === "ECONNREFUSED") {
         userFriendlyError = `Network / Connection timeout reaching Gmail SMTP server (smtp.gmail.com). Error code: ${err.code}`;
@@ -3419,6 +3450,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
       return {
         success: false,
+        durationMs,
         error: userFriendlyError,
         details: {
           code: err?.code,
@@ -3429,6 +3461,26 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         },
       };
     }
+  }
+
+  // Non-blocking, asynchronous fire-and-forget background email sender
+  function sendEmailAsync({
+    to,
+    subject,
+    html,
+  }: {
+    to: string;
+    subject: string;
+    html: string;
+  }) {
+    setImmediate(async () => {
+      try {
+        console.log(`[sendEmailAsync Background Triggered] Dispatching email to ${to}...`);
+        await sendEmail({ to, subject, html });
+      } catch (err: any) {
+        console.error("[sendEmailAsync Background Error]:", err?.message || err);
+      }
+    });
   }
 
   // API Endpoint to test Gmail SMTP credentials & send diagnostic test email
@@ -3495,6 +3547,126 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     } catch (err: any) {
       console.error("[api/test-email Error]:", err);
       return res.status(500).json({ success: false, error: err?.message || "Internal error sending test email." });
+    }
+  });
+
+  // HTML Email Template for 6-Digit Verification Code
+  function generateVerificationCodeEmailHtml({ code, email }: { code: string; email: string }) {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #f8fafc; }
+          .container { max-width: 520px; margin: 0 auto; background: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
+          .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; padding: 24px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+          .header p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
+          .body { padding: 28px 24px; text-align: center; }
+          .code-box { background: #0f172a; border: 2px dashed #6366f1; border-radius: 12px; padding: 18px 24px; margin: 20px 0; display: inline-block; }
+          .code-text { font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #a855f7; font-family: 'Courier New', Courier, monospace; margin: 0; }
+          .footer { text-align: center; font-size: 12px; color: #64748b; padding: 16px 24px; background: #0f172a; border-top: 1px solid #334155; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Boardly Verification Code</h1>
+            <p>Complete your account verification</p>
+          </div>
+          <div class="body">
+            <p style="font-size: 14px; color: #cbd5e1; margin-top: 0;">Your 6-digit email verification code for <strong>${email}</strong> is:</p>
+            <div class="code-box">
+              <div class="code-text">${code}</div>
+            </div>
+            <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">Enter this code in the app to complete verification. This code expires in 15 minutes.</p>
+          </div>
+          <div class="footer">
+            © ${new Date().getFullYear()} Boardly. If you did not request this code, please ignore this email.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  // API Endpoint: Send 6-Digit Verification Code (Asynchronous Non-blocking)
+  app.post("/api/send-verification-code", async (req: express.Request, res: express.Response) => {
+    try {
+      const { email } = req.body || {};
+      if (!email || typeof email !== 'string') {
+        return res.status(400).json({ success: false, error: "Valid email address is required." });
+      }
+
+      const normEmail = email.trim().toLowerCase();
+      // Code generation logic: Math.floor(100000 + Math.random() * 900000).toString() -> strictly 6 digits
+      const code = generate6DigitCode();
+      const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
+
+      inMemoryVerificationCodes.set(normEmail, { code, expiresAt });
+      console.log(`[VERIFICATION CODE GENERATED] Generated 6-digit code for ${normEmail}: ${code}`);
+
+      // Asynchronous background fire-and-forget email dispatch
+      sendEmailAsync({
+        to: normEmail,
+        subject: `Your Boardly Verification Code: ${code}`,
+        html: generateVerificationCodeEmailHtml({ code, email: normEmail }),
+      });
+
+      // Immediate response to prevent frontend blocking/waiting
+      return res.status(200).json({
+        success: true,
+        message: "6-digit verification code sent asynchronously.",
+        codeLength: 6,
+      });
+    } catch (err: any) {
+      console.error("[api/send-verification-code Error]:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Failed to send verification code." });
+    }
+  });
+
+  // API Endpoint: Verify 6-Digit Code
+  app.post("/api/verify-code", async (req: express.Request, res: express.Response) => {
+    try {
+      const { email, code } = req.body || {};
+      if (!email || !code) {
+        return res.status(400).json({ success: false, error: "Email and 6-digit verification code are required." });
+      }
+
+      const normEmail = email.trim().toLowerCase();
+      const normCode = String(code).trim();
+
+      if (normCode.length !== 6) {
+        return res.status(400).json({ success: false, error: "Verification code must be exactly 6 digits." });
+      }
+
+      const stored = inMemoryVerificationCodes.get(normEmail);
+
+      if (!stored) {
+        return res.status(400).json({ success: false, error: "No verification code found for this email. Please request a new code." });
+      }
+
+      if (Date.now() > stored.expiresAt) {
+        inMemoryVerificationCodes.delete(normEmail);
+        return res.status(400).json({ success: false, error: "Verification code has expired. Please request a new code." });
+      }
+
+      if (stored.code !== normCode) {
+        return res.status(400).json({ success: false, error: "Invalid verification code. Please check the 6 digits and try again." });
+      }
+
+      // Consumed successfully
+      inMemoryVerificationCodes.delete(normEmail);
+      console.log(`✅ [VERIFICATION CODE VERIFIED] Standardized 6-digit code verified successfully for ${normEmail}`);
+
+      return res.status(200).json({
+        success: true,
+        message: "Verification code verified successfully.",
+      });
+    } catch (err: any) {
+      console.error("[api/verify-code Error]:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Error verifying code." });
     }
   });
 

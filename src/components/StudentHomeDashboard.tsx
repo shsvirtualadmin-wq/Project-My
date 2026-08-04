@@ -235,10 +235,18 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
   };
 
   const totalMcqsSolved = history.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const correctMcqsSolved = history.reduce((acc, curr) => acc + (curr.score || 0), 0);
   const avgAccuracy = history.length
     ? Math.round(history.reduce((acc, curr) => acc + getItemPct(curr), 0) / history.length)
     : 0;
   const testsCompleted = history.length;
+
+  // Gamification: XP & Levels
+  const currentXP = (testsCompleted * 50) + (correctMcqsSolved * 10);
+  const currentLevel = Math.floor(Math.sqrt(currentXP / 100)) + 1;
+  const xpForCurrentLevel = Math.pow(currentLevel - 1, 2) * 100;
+  const xpForNextLevel = Math.pow(currentLevel, 2) * 100;
+  const progressToNextLevel = ((currentXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100;
 
   return (
     <section className="animate-ios-spring flex-1 flex flex-col gap-5 py-2">
@@ -282,6 +290,25 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed font-normal">
             Track your FBISE board exam practice performance, review chapter accuracy, and practice targeted MCQs.
           </p>
+        </div>
+
+        {/* XP & Level Progress */}
+        <div className="relative z-10 pt-1 pb-2">
+          <div className="flex items-center justify-between text-xs mb-2">
+            <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+              <Award className="w-4 h-4 text-[#F2B90C]" />
+              Level {currentLevel}
+            </span>
+            <span className="font-extrabold text-[#D99A00] dark:text-[#F2B90C]">
+              {currentXP} / {xpForNextLevel} XP
+            </span>
+          </div>
+          <div className="h-2.5 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
+            <div 
+              className="h-full bg-gradient-to-r from-[#F2B90C] to-[#F5D166] rounded-full transition-all duration-1000 ease-out"
+              style={{ width: `${progressToNextLevel}%` }}
+            />
+          </div>
         </div>
 
         {/* Primary Action Buttons */}
