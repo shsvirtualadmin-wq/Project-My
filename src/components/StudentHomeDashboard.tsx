@@ -22,6 +22,7 @@ import { User, StudentProfile, fetchStudentWeaknessProfile, StudentWeaknessProfi
 import { HistoryItem } from '../types';
 import { PastPapersSection } from './PastPapersSection';
 import { InstitutionBadge } from './InstitutionBadge';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 
 /**
  * Accuracy threshold percentage cutoff for identifying weak subject/chapter areas.
@@ -397,7 +398,10 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 relative z-10 pt-1">
           <button
             type="button"
-            onClick={onStartPracticeTest}
+            onClick={() => {
+              triggerHaptic(HAPTIC_PATTERNS.medium);
+              onStartPracticeTest();
+            }}
             className="flex-1 bg-[#F2B90C] hover:bg-[#E0A800] text-[#0A0A0A] font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
           >
             <Zap className="w-4 h-4 text-[#0A0A0A] fill-[#0A0A0A]" />
@@ -407,7 +411,10 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           {onSelectTcat && (
             <button
               type="button"
-              onClick={onSelectTcat}
+              onClick={() => {
+                triggerHaptic(HAPTIC_PATTERNS.medium);
+                onSelectTcat();
+              }}
               className="flex-1 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer border border-cyan-400/30"
             >
               <Target className="w-4 h-4 text-cyan-200" />
@@ -418,7 +425,10 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           {onSelectMdcat && (
             <button
               type="button"
-              onClick={onSelectMdcat}
+              onClick={() => {
+                triggerHaptic(HAPTIC_PATTERNS.medium);
+                onSelectMdcat();
+              }}
               className="flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer border border-rose-400/30"
             >
               <Sparkles className="w-4 h-4 text-white fill-white/20" />
@@ -428,7 +438,10 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
 
           <button
             type="button"
-            onClick={onOpenLmsPortal}
+            onClick={() => {
+              triggerHaptic(HAPTIC_PATTERNS.light);
+              onOpenLmsPortal();
+            }}
             className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-white/10 dark:hover:bg-white/20 border border-slate-900 dark:border-white/15 font-bold py-3.5 px-4 rounded-2xl transition-all active:scale-95 flex items-center justify-center gap-2 text-xs cursor-pointer"
           >
             <BookOpen className="w-4 h-4 text-[#F2B90C]" />

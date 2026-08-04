@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PathType, QuestionDifficulty, TestMode } from '../types';
 import { fetchStudentMcqUsage, StudentMcqUsageInfo, User } from '../lib/supabase';
 import { Sparkles, Zap, Check, ShieldCheck, Gauge, AlertTriangle, ArrowLeft, ArrowRight } from 'lucide-react';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 
 interface DurationScreenProps {
   stepLabel?: string;
@@ -48,6 +49,7 @@ export const DurationScreen: React.FC<DurationScreenProps> = ({
 
   const handleStart = () => {
     if (isGenerating) return;
+    triggerHaptic(HAPTIC_PATTERNS.medium);
     onStartTest({
       subject,
       customTopic,

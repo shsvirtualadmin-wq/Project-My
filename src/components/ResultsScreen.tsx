@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 import { TestResult } from '../types';
 import { User } from '../lib/supabase';
 import { SecurityWatermark } from './SecurityWatermark';
@@ -418,6 +419,7 @@ export const ResultsScreen: React.FC<ResultsScreenProps> = ({
 
                         <button
                           onClick={() => {
+                            triggerHaptic(HAPTIC_PATTERNS.medium);
                             if (onExplainMcq) {
                               onExplainMcq({
                                 question: q.q,

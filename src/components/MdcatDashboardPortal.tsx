@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Sparkles,
@@ -136,6 +137,7 @@ export const MdcatDashboardPortal: React.FC<MdcatDashboardPortalProps> = ({
   };
 
   const handleConfirmStartTest = () => {
+    triggerHaptic(HAPTIC_PATTERNS.medium);
     const topicString = selectedSubtopic
       ? `${selectedChapter?.name} - ${selectedSubtopic}`
       : selectedChapter

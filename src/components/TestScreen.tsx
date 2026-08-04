@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 import { Question, UserAnswer, TestConfig } from '../types';
 import { User } from '../lib/supabase';
 import { SecurityWatermark } from './SecurityWatermark';
@@ -109,6 +110,7 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
   const handleSelectOption = (optIndex: number) => {
     if (isAnswered) return;
 
+    triggerHaptic(HAPTIC_PATTERNS.light);
     const timeSpent = Math.round((Date.now() - questionStartTimeRef.current) / 1000);
 
     setUserAnswers((prev) => ({
@@ -429,6 +431,7 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
 
                     <button
                       onClick={() => {
+                        triggerHaptic(HAPTIC_PATTERNS.medium);
                         if (onExplainMcq) {
                           onExplainMcq({
                             question: currentQ.q,

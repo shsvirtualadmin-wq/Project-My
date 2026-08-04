@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 import { BoardClass, QuestionDifficulty, TestMode, HistoryItem, Question, TestConfig } from '../types';
 import { MdcatDashboardPortal } from './MdcatDashboardPortal';
 import { TcatDashboardPortal } from './TcatDashboardPortal';
@@ -315,6 +316,7 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
   };
 
   const handleLaunchPractice = (subject: string, topic?: string) => {
+    triggerHaptic(HAPTIC_PATTERNS.medium);
     const targetSub = mapSubject(subject);
     onStartTest({
       subject: targetSub,
@@ -328,6 +330,7 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
   };
 
   const handleLaunchMock = (subject?: string) => {
+    triggerHaptic(HAPTIC_PATTERNS.medium);
     const targetSub = mapSubject(subject || config.subjects[0] || 'Physics');
     onStartTest({
       subject: targetSub,
@@ -810,6 +813,7 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
                   resolvedTopic = genTopic;
                 }
 
+                triggerHaptic(HAPTIC_PATTERNS.medium);
                 onStartTest({
                   subject: genSubject,
                   customTopic: resolvedTopic,

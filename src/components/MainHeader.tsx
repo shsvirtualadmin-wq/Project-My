@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 import {
   Menu,
   X,
@@ -314,13 +315,20 @@ export const MainHeader: React.FC<MainHeaderProps> = React.memo(({
                 <span>My Track</span>
               </button>
               <button
-                onClick={() => (onNavigatePractice ? onNavigatePractice() : onStartFree?.())}
+                onClick={() => {
+                  triggerHaptic(HAPTIC_PATTERNS.medium);
+                  if (onNavigatePractice) onNavigatePractice();
+                  else if (onStartFree) onStartFree?.();
+                }}
                 className="hover:text-[#F2B90C] transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <span>Practice Tests</span>
               </button>
               <button
-                onClick={() => onOpenStudyBuddy?.()}
+                onClick={() => {
+                  triggerHaptic(HAPTIC_PATTERNS.medium);
+                  onOpenStudyBuddy?.();
+                }}
                 className="hover:text-[#F2B90C] transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <span>Study Buddy AI</span>
@@ -615,6 +623,7 @@ export const MainHeader: React.FC<MainHeaderProps> = React.memo(({
                 </button>
                 <button
                   onClick={() => {
+                    triggerHaptic(HAPTIC_PATTERNS.medium);
                     setMobileMenuOpen(false);
                     if (onNavigatePractice) onNavigatePractice();
                     else if (onStartFree) onStartFree();
@@ -628,6 +637,7 @@ export const MainHeader: React.FC<MainHeaderProps> = React.memo(({
                 </button>
                 <button
                   onClick={() => {
+                    triggerHaptic(HAPTIC_PATTERNS.medium);
                     setMobileMenuOpen(false);
                     if (onOpenStudyBuddy) onOpenStudyBuddy();
                   }}

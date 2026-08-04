@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 import {
   apiFetch,
   supabase,
@@ -296,6 +297,7 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
   const handleSendStream = async (userPromptText: string, mcqCtx?: MCQContext | null) => {
     if (!userPromptText.trim() || isStreaming) return;
 
+    triggerHaptic(HAPTIC_PATTERNS.light);
     setRateLimitError(null);
     inferContextFromPrompt(userPromptText);
 
@@ -503,7 +505,10 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
     return (
       <button
         type="button"
-        onClick={onClose}
+        onClick={() => {
+          triggerHaptic(HAPTIC_PATTERNS.medium);
+          onClose();
+        }}
         className="fixed bottom-5 right-5 sm:bottom-6 sm:right-6 z-[45] bg-gradient-to-r from-amber-400 via-amber-500 to-amber-600 hover:from-amber-300 hover:to-amber-500 text-slate-950 font-black shadow-2xl shadow-amber-500/40 border-2 border-amber-200/90 rounded-full px-4 py-3 sm:px-5 sm:py-3.5 flex items-center gap-2.5 transition-all duration-200 active:scale-95 cursor-pointer hover:shadow-amber-500/60 hover:scale-105 group"
         aria-label="Open Study Buddy AI Tutor"
         title="Ask Study Buddy AI Tutor"
@@ -561,7 +566,10 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={handleStartNewChat}
+              onClick={() => {
+                triggerHaptic(HAPTIC_PATTERNS.light);
+                handleStartNewChat();
+              }}
               disabled={isStreaming}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-300 bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 rounded-xl transition-all active:scale-95 disabled:opacity-50 cursor-pointer shadow-sm"
               title="Start a new empty study session"
@@ -572,7 +580,10 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
 
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => {
+                triggerHaptic(HAPTIC_PATTERNS.light);
+                onClose();
+              }}
               className="p-1.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               title="Close Study Buddy"
             >
