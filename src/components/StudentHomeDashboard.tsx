@@ -15,7 +15,8 @@ import {
   BarChart2,
   Target,
   AlertCircle,
-  FolderOpen
+  FolderOpen,
+  Flame
 } from 'lucide-react';
 import { User, StudentProfile, fetchStudentWeaknessProfile, StudentWeaknessProfileData } from '../lib/supabase';
 import { HistoryItem } from '../types';
@@ -248,6 +249,90 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
   const xpForNextLevel = Math.pow(currentLevel, 2) * 100;
   const progressToNextLevel = ((currentXP - xpForCurrentLevel) / (xpForNextLevel - xpForCurrentLevel)) * 100;
 
+  // Calculate daily practice streak based on test history
+  const dailyStreak = React.useMemo(() => {
+    if (!history || history.length === 0) return 0;
+
+    const uniqueDays = new Set<string>();
+    history.forEach((item) => {
+      let dateObj: Date | null = null;
+      if (item.dateStr) dateObj = new Date(item.dateStr);
+      if (!dateObj || isNaN(dateObj.getTime())) dateObj = new Date();
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      uniqueDays.add(`${year}-${month}-${day}`);
+    });
+
+    const formatDate = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
+
+    const today = new Date();
+    const todayStr = formatDate(today);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = formatDate(yesterday);
+
+    let currentCheck = new Date(today);
+    if (!uniqueDays.has(todayStr)) {
+      if (!uniqueDays.has(yesterdayStr)) {
+        return 0;
+      }
+      currentCheck = yesterday;
+    }
+
+    let streak = 0;
+    while (true) {
+      const dayStr = formatDate(currentCheck);
+      if (uniqueDays.has(dayStr)) {
+        streak++;
+        currentCheck.setDate(currentCheck.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  }, [history]);
+
+  // Last 7 days status for weekly activity pills in streak card
+  const last7DaysStatus = React.useMemo(() => {
+    const days: { dayName: string; isActive: boolean; isToday: boolean }[] = [];
+    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const uniqueDays = new Set<string>();
+
+    history.forEach((item) => {
+      let dateObj: Date | null = null;
+      if (item.dateStr) dateObj = new Date(item.dateStr);
+      if (!dateObj || isNaN(dateObj.getTime())) dateObj = new Date();
+      const year = dateObj.getFullYear();
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      uniqueDays.add(`${year}-${month}-${day}`);
+    });
+
+    const today = new Date();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      const dateKey = `${y}-${m}-${day}`;
+
+      days.push({
+        dayName: dayLabels[d.getDay()],
+        isActive: uniqueDays.has(dateKey),
+        isToday: i === 0,
+      });
+    }
+    return days;
+  }, [history]);
+
   return (
     <section className="animate-ios-spring flex-1 flex flex-col gap-5 py-2">
       {/* Personalized Welcome Card */}
@@ -255,10 +340,24 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
         <div className="absolute top-0 right-0 w-72 h-72 bg-[#F2B90C]/15 dark:bg-[#F2B90C]/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="flex flex-wrap items-center justify-between gap-3 relative z-10">
-          {/* Locked Class/Stream Tag */}
-          <div className="inline-flex items-center gap-2 bg-[#007AFF]/10 dark:bg-[#0A84FF]/20 border border-[#007AFF]/30 dark:border-[#0A84FF]/40 text-[#007AFF] dark:text-[#64D2FF] px-3.5 py-1.5 rounded-full text-xs font-extrabold">
-            <Lock className="w-3.5 h-3.5 shrink-0" />
-            <span>{classStreamDisplay}</span>
+          {/* Locked Class/Stream Tag & Quick Badges */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex items-center gap-2 bg-[#007AFF]/10 dark:bg-[#0A84FF]/20 border border-[#007AFF]/30 dark:border-[#0A84FF]/40 text-[#007AFF] dark:text-[#64D2FF] px-3.5 py-1.5 rounded-full text-xs font-extrabold">
+              <Lock className="w-3.5 h-3.5 shrink-0" />
+              <span>{classStreamDisplay}</span>
+            </div>
+
+            {/* Header Streak Pill */}
+            <div className="inline-flex items-center gap-1.5 bg-orange-500/10 border border-orange-500/30 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-full text-xs font-extrabold">
+              <Flame className="w-3.5 h-3.5 fill-orange-500 text-orange-500" />
+              <span>{dailyStreak > 0 ? `${dailyStreak}d Streak 🔥` : '0d Streak'}</span>
+            </div>
+
+            {/* Header Level Pill */}
+            <div className="inline-flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/30 text-amber-600 dark:text-amber-400 px-3 py-1 rounded-full text-xs font-extrabold">
+              <Award className="w-3.5 h-3.5 fill-amber-500/20 text-amber-500" />
+              <span>Lvl {currentLevel}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -278,7 +377,7 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           </div>
         </div>
 
-        {/* Greeting Banner & XP Progress Ring */}
+        {/* Greeting Banner */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
           <div className="space-y-2 flex-1">
             <div className="flex items-center gap-2 text-xs font-extrabold text-[#D99A00] dark:text-[#F2B90C] uppercase tracking-wider">
@@ -291,74 +390,6 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
             <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed font-normal">
               Track your FBISE board exam practice performance, review chapter accuracy, and practice targeted MCQs.
             </p>
-          </div>
-
-          {/* XP Circular Progress Ring */}
-          <div className="flex items-center gap-3.5 bg-slate-100/80 dark:bg-black/40 border border-slate-200 dark:border-white/10 p-3 sm:p-3.5 rounded-2xl shrink-0 self-start sm:self-center shadow-inner">
-            <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
-              <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
-                {/* Background Ring */}
-                <circle
-                  cx="32"
-                  cy="32"
-                  r="26"
-                  className="text-slate-200 dark:text-white/10"
-                  strokeWidth="5"
-                  stroke="currentColor"
-                  fill="transparent"
-                />
-                {/* Progress Ring */}
-                <circle
-                  cx="32"
-                  cy="32"
-                  r="26"
-                  className="text-[#F2B90C] transition-all duration-1000 ease-out"
-                  strokeWidth="5"
-                  strokeDasharray={163.36}
-                  strokeDashoffset={163.36 - (163.36 * progressToNextLevel) / 100}
-                  strokeLinecap="round"
-                  stroke="currentColor"
-                  fill="transparent"
-                />
-              </svg>
-              {/* Level Center Icon */}
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 leading-none">LVL</span>
-                <span className="text-base font-black text-slate-900 dark:text-white font-['Space_Grotesk'] leading-tight">{currentLevel}</span>
-              </div>
-            </div>
-
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-1.5 text-xs font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
-                <Award className="w-4 h-4 text-[#F2B90C] fill-[#F2B90C]/20" />
-                <span>{currentXP.toLocaleString()} total XP</span>
-              </div>
-              <p className="text-[11px] font-bold text-[#D99A00] dark:text-[#F2B90C]">
-                {Math.round(progressToNextLevel)}% to Level {currentLevel + 1}
-              </p>
-              <p className="text-[10px] text-slate-500 dark:text-slate-400">
-                +50 XP/test • +10 XP/correct
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* XP & Level Progress Linear Bar */}
-        <div className="relative z-10 pt-1 pb-1">
-          <div className="flex items-center justify-between text-xs mb-1.5">
-            <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-[#F2B90C] fill-[#F2B90C]" />
-              Level {currentLevel} Progress
-            </span>
-            <span className="font-extrabold text-[#D99A00] dark:text-[#F2B90C] font-['Space_Grotesk']">
-              {currentXP} / {xpForNextLevel} XP
-            </span>
-          </div>
-          <div className="h-3 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden shadow-inner p-0.5 border border-slate-300/50 dark:border-white/5">
-            <div 
-              className="h-full bg-gradient-to-r from-[#F2B90C] via-[#F5D166] to-[#F2B90C] rounded-full transition-all duration-1000 ease-out shadow-sm"
-              style={{ width: `${Math.max(4, progressToNextLevel)}%` }}
-            />
           </div>
         </div>
 
@@ -449,51 +480,204 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
         <PastPapersSection />
       ) : (
         <>
-          {/* Progress Summary Cards (Overall Academic Progress) */}
+          {/* Progress Summary Bento Grid (Academic Performance & Gamification) */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
           <h3 className="font-['Space_Grotesk'] text-sm font-bold text-[#0A0A0A] dark:text-white flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-            <span>Overall Academic Progress</span>
+            <span>Gamification & Performance Hub</span>
           </h3>
-          <span className="text-[11px] text-slate-500 font-medium">Real-time Analytics</span>
+          <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium bg-slate-100 dark:bg-white/10 px-2.5 py-0.5 rounded-full">
+            Real-time Analytics
+          </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-          {/* Metric 1: Total MCQs Solved */}
-          <div className="bg-white dark:bg-[#151515] border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-sm space-y-1.5 relative overflow-hidden">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-[11px] font-bold">MCQs Solved</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4">
+          {/* Bento Item 1: XP Progress Ring Card */}
+          <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-white dark:bg-[#151515] border border-amber-200/80 dark:border-amber-500/20 rounded-3xl p-5 shadow-sm hover:border-amber-400 dark:hover:border-amber-500/40 transition-all flex flex-col justify-between gap-4 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-[#F2B90C]/10 dark:bg-[#F2B90C]/5 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-amber-100 dark:bg-amber-500/10 border border-amber-300/50 dark:border-amber-500/20 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                  <Award className="w-4 h-4 fill-amber-500/20" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Level & XP Progress</h4>
+                  <p className="text-sm font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk']">Level {currentLevel} Explorer</p>
+                </div>
+              </div>
+              <span className="text-xs font-black text-[#D99A00] dark:text-[#F2B90C] bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 px-3 py-1 rounded-full">
+                {currentXP.toLocaleString()} XP
+              </span>
             </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk']">
-              {totalMcqsSolved}
+
+            {/* Circular Progress Ring + XP Bar */}
+            <div className="flex items-center gap-4 relative z-10">
+              <div className="relative w-16 h-16 sm:w-20 sm:h-20 flex items-center justify-center shrink-0">
+                <svg className="w-16 h-16 sm:w-20 sm:h-20 transform -rotate-90" viewBox="0 0 64 64">
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="26"
+                    className="text-slate-100 dark:text-white/10"
+                    strokeWidth="5"
+                    stroke="currentColor"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="32"
+                    cy="32"
+                    r="26"
+                    className="text-[#F2B90C] transition-all duration-1000 ease-out"
+                    strokeWidth="5"
+                    strokeDasharray={163.36}
+                    strokeDashoffset={163.36 - (163.36 * progressToNextLevel) / 100}
+                    strokeLinecap="round"
+                    stroke="currentColor"
+                    fill="transparent"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                  <span className="text-[9px] font-extrabold text-slate-400 leading-none">LVL</span>
+                  <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white font-['Space_Grotesk'] leading-tight">{currentLevel}</span>
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700 dark:text-slate-300">Progress to Lvl {currentLevel + 1}</span>
+                  <span className="font-extrabold text-[#D99A00] dark:text-[#F2B90C]">{Math.round(progressToNextLevel)}%</span>
+                </div>
+                <div className="h-2.5 w-full bg-slate-100 dark:bg-white/10 rounded-full overflow-hidden p-0.5 border border-slate-200 dark:border-white/5">
+                  <div
+                    className="h-full bg-gradient-to-r from-[#F2B90C] via-[#F5D166] to-[#F2B90C] rounded-full transition-all duration-1000 ease-out"
+                    style={{ width: `${Math.max(5, progressToNextLevel)}%` }}
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  {currentXP} / {xpForNextLevel} XP • +50/test, +10/correct
+                </p>
+              </div>
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">Total questions attempted</p>
           </div>
 
-          {/* Metric 2: Average Accuracy */}
-          <div className="bg-white dark:bg-[#151515] border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-sm space-y-1.5 relative overflow-hidden">
-            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-[11px] font-bold">Average Accuracy</span>
-              <Award className="w-4 h-4 text-[#F2B90C]" />
+          {/* Bento Item 2: Daily Streak Badge Card */}
+          <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-white dark:bg-[#151515] border border-orange-200/80 dark:border-orange-500/20 rounded-3xl p-5 shadow-sm hover:border-orange-400 dark:hover:border-orange-500/40 transition-all flex flex-col justify-between gap-4 relative overflow-hidden group">
+            <div className="absolute top-0 right-0 w-36 h-36 bg-orange-500/10 dark:bg-orange-500/5 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex items-center justify-between relative z-10">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-100 dark:bg-orange-500/10 border border-orange-300/50 dark:border-orange-500/20 flex items-center justify-center text-orange-600 dark:text-orange-400">
+                  <Flame className="w-4 h-4 fill-orange-500/30" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Practice Streak</h4>
+                  <p className="text-sm font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk']">
+                    {dailyStreak > 0 ? `${dailyStreak} Day Streak 🔥` : 'Start Your Streak'}
+                  </p>
+                </div>
+              </div>
+              <span className={`text-xs font-black px-3 py-1 rounded-full border ${
+                dailyStreak > 0
+                  ? 'bg-orange-50 dark:bg-orange-500/10 border-orange-200 dark:border-orange-500/20 text-orange-600 dark:text-orange-400'
+                  : 'bg-slate-100 dark:bg-white/5 border-slate-200 dark:border-white/10 text-slate-500'
+              }`}>
+                {dailyStreak > 0 ? 'Active 🔥' : 'Inactive'}
+              </span>
             </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] flex items-baseline gap-1">
-              <span>{avgAccuracy}%</span>
+
+            {/* Streak 7-Day Visualizer */}
+            <div className="space-y-2 relative z-10">
+              <div className="flex items-center justify-between gap-1">
+                {last7DaysStatus.map((d, idx) => (
+                  <div key={idx} className="flex flex-col items-center gap-1 flex-1">
+                    <div
+                      className={`w-full h-8 sm:h-9 rounded-xl flex items-center justify-center transition-all ${
+                        d.isActive
+                          ? 'bg-gradient-to-b from-orange-400 to-amber-500 text-white shadow-sm shadow-orange-500/30 font-bold'
+                          : d.isToday
+                          ? 'bg-orange-100 dark:bg-orange-500/20 border border-dashed border-orange-400 text-orange-600 dark:text-orange-300'
+                          : 'bg-slate-100 dark:bg-white/5 text-slate-400 dark:text-slate-600'
+                      }`}
+                    >
+                      {d.isActive ? (
+                        <Flame className="w-4 h-4 fill-white" />
+                      ) : (
+                        <span className="text-[10px] font-extrabold">{d.dayName[0]}</span>
+                      )}
+                    </div>
+                    <span className={`text-[10px] font-bold ${d.isToday ? 'text-orange-600 dark:text-orange-400' : 'text-slate-400'}`}>
+                      {d.dayName}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center sm:text-left">
+                {dailyStreak > 0
+                  ? `You've practiced ${dailyStreak} consecutive day${dailyStreak > 1 ? 's' : ''}! Keep up the daily habit.`
+                  : 'Complete at least 1 practice session today to ignite your streak!'}
+              </p>
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">Overall score percentage</p>
           </div>
 
-          {/* Metric 3: Tests Completed */}
-          <div className="col-span-2 sm:col-span-1 bg-white dark:bg-[#151515] border border-slate-200 dark:border-white/10 rounded-2xl p-4 shadow-sm space-y-1.5 relative overflow-hidden">
+          {/* Bento Item 3: MCQs Solved Card */}
+          <div className="col-span-1 bg-white dark:bg-[#151515] border border-slate-200 dark:border-white/10 rounded-3xl p-4.5 shadow-sm hover:border-emerald-300 dark:hover:border-emerald-500/30 transition-all flex flex-col justify-between gap-3 relative overflow-hidden">
             <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
-              <span className="text-[11px] font-bold">Tests Taken</span>
-              <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span className="text-xs font-bold uppercase tracking-wider">MCQs Solved</span>
+              <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="w-4 h-4" />
+              </div>
             </div>
-            <div className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk']">
-              {testsCompleted}
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] leading-tight">
+                {totalMcqsSolved}
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {correctMcqsSolved} answered correctly
+              </p>
             </div>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400">Practice test sessions</p>
+          </div>
+
+          {/* Bento Item 4: Average Accuracy Card */}
+          <div className="col-span-1 bg-white dark:bg-[#151515] border border-slate-200 dark:border-white/10 rounded-3xl p-4.5 shadow-sm hover:border-amber-300 dark:hover:border-amber-500/30 transition-all flex flex-col justify-between gap-3 relative overflow-hidden">
+            <div className="flex items-center justify-between text-slate-500 dark:text-slate-400">
+              <span className="text-xs font-bold uppercase tracking-wider">Avg Accuracy</span>
+              <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <Target className="w-4 h-4" />
+              </div>
+            </div>
+            <div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] leading-tight">
+                {avgAccuracy}%
+              </div>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                {avgAccuracy >= 80 ? 'Mastery Tier ⭐' : avgAccuracy >= 60 ? 'Passing Range 👍' : 'Targeted Practice Needed'}
+              </p>
+            </div>
+          </div>
+
+          {/* Bento Item 5: Tests Taken Card (Spans 2 cols on lg) */}
+          <div className="col-span-1 sm:col-span-2 lg:col-span-2 bg-white dark:bg-[#151515] border border-slate-200 dark:border-white/10 rounded-3xl p-4.5 shadow-sm hover:border-sky-300 dark:hover:border-sky-500/30 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative overflow-hidden">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-2xl bg-sky-100 dark:bg-sky-500/10 border border-sky-300/40 dark:border-sky-500/20 flex items-center justify-center text-sky-600 dark:text-sky-400 shrink-0">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Practice Sessions</h4>
+                <p className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-white font-['Space_Grotesk'] leading-tight">
+                  {testsCompleted} Tests Completed
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenHistory}
+              className="text-xs font-extrabold text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20 hover:bg-sky-100 dark:hover:bg-sky-500/20 px-3.5 py-2 rounded-xl transition-all cursor-pointer flex items-center gap-1 shrink-0 self-stretch sm:self-auto justify-center"
+            >
+              <span>Review History</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
           </div>
         </div>
       </div>
