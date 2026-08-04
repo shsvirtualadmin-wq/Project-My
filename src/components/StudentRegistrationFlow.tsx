@@ -35,6 +35,8 @@ import {
   X,
   AlertCircle,
   HelpCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 
 interface StudentRegistrationFlowProps {
@@ -176,6 +178,10 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
   );
   const [email, setEmail] = useState<string>(user?.email || '');
   const [phone, setPhone] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   // Step 1: Track Selection
   const [selectedTrack, setSelectedTrack] = useState<'FBISE' | 'MDCAT' | 'TCAT'>('FBISE');
@@ -279,6 +285,20 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
     if (!email.trim() || !email.includes('@')) {
       setError('Please enter a valid email address.');
       return;
+    }
+    if (!user || password.trim()) {
+      if (!password) {
+        setError('Please create a password for your account.');
+        return;
+      }
+      if (password.length < 6) {
+        setError('Password must be at least 6 characters long.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match. Please verify your password.');
+        return;
+      }
     }
     setCurrentStep(2);
   };
@@ -384,12 +404,43 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
         : `UET Taxila TCAT (${tcatGroup})`;
 
     try {
-      // 1. Submit Payment Request details to backend
+      // 1. Account Creation with Supabase Auth if user is not already logged in
+      let registeredUserId = user?.id;
+      if (!registeredUserId && email.trim() && password) {
+        try {
+          const redirectUrl = `${window.location.origin}${window.location.pathname}`;
+          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              data: {
+                full_name: fullName.trim(),
+                name: fullName.trim(),
+                phone: phone.trim(),
+              },
+              emailRedirectTo: redirectUrl,
+            },
+          });
+
+          if (signUpErr) {
+            console.warn('Supabase auth.signUp warning during registration submission:', signUpErr);
+          }
+          if (signUpData?.user?.id) {
+            registeredUserId = signUpData.user.id;
+          }
+        } catch (authEx) {
+          console.warn('Supabase auth.signUp exception during registration submission:', authEx);
+        }
+      }
+
+      const userId = registeredUserId || `anon-${Date.now()}`;
+
+      // 2. Submit Payment Request details to backend
       const res = await fetch('/api/payment-requests/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          student_id: user?.id || `anon-${Date.now()}`,
+          student_id: userId,
           student_name: fullName.trim(),
           student_email: email.trim(),
           payment_method: selectedMethod,
@@ -404,8 +455,7 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
         throw new Error(resData.error || 'Failed to submit payment details.');
       }
 
-      // 2. Save / Update student profile in Supabase
-      const userId = user?.id || `anon-${Date.now()}`;
+      // 3. Save / Update student profile in Supabase
       const savedProfile = await saveStudentRegistration(userId, {
         name: fullName.trim(),
         email: email.trim(),
@@ -574,6 +624,50 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
                   placeholder="student@example.com"
                   className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white outline-none"
                 />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                  Password {!user && <span className="text-amber-500">*</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    required={!user}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Min. 6 characters"
+                    className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl pl-3.5 pr-9 py-2 text-xs text-slate-900 dark:text-white outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                  >
+                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
+                  Confirm Password {!user && <span className="text-amber-500">*</span>}
+                </label>
+                <div className="relative">
+                  <input
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required={!user}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="Re-enter password"
+                    className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl pl-3.5 pr-9 py-2 text-xs text-slate-900 dark:text-white outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                  </button>
+                </div>
               </div>
             </div>
             <div>
