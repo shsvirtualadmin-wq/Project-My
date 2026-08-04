@@ -139,6 +139,13 @@ const getInitialUrlState = (): {
     window.location.search.includes('error=') ||
     window.location.hash.includes('error=')
   ) {
+    if (
+      window.location.pathname.includes('/reset-password') ||
+      window.location.search.includes('type=recovery') ||
+      window.location.hash.includes('type=recovery')
+    ) {
+      return { screen: 'reset_password', selectedSubject: 'Urdu' };
+    }
     return { screen: 'auth', selectedSubject: 'Urdu' };
   }
 
@@ -800,6 +807,13 @@ export function App() {
       });
       console.log('====================================');
 
+      const isRecovery =
+        authType === 'recovery' ||
+        window.location.hash.includes('type=recovery') ||
+        window.location.search.includes('type=recovery') ||
+        window.location.pathname.includes('/reset-password') ||
+        screenRef.current === 'reset_password';
+
       if (tokenHash) {
         console.log('[Auth Callback] Verifying token_hash with Supabase verifyOtp...');
         verifyEmailTokenHash(tokenHash, authType || 'signup').then((res) => {
@@ -807,10 +821,18 @@ export function App() {
           if (res.success && res.session?.user) {
             console.log('[Auth Callback] Verification success! User session set:', res.session.user.email);
             setCurrentUser(res.session.user);
-            window.history.replaceState(null, '', window.location.pathname);
+            if (isRecovery) {
+              setScreen('reset_password');
+            } else {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
           } else if (res.error) {
             console.error('[Auth Callback] token_hash verification error:', res.error);
-            setScreen('auth');
+            if (isRecovery) {
+              setScreen('reset_password');
+            } else {
+              setScreen('auth');
+            }
           }
         });
       } else if (codeParam) {
@@ -820,15 +842,27 @@ export function App() {
           if (!error && data?.session?.user) {
             console.log('[Auth Callback] Code exchange success! User session set:', data.session.user.email);
             setCurrentUser(data.session.user);
-            window.history.replaceState(null, '', window.location.pathname);
+            if (isRecovery) {
+              setScreen('reset_password');
+            } else {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
           } else if (error) {
             console.error('[Auth Callback] Code exchange error:', error);
-            setScreen('auth');
+            if (isRecovery) {
+              setScreen('reset_password');
+            } else {
+              setScreen('auth');
+            }
           }
         });
       } else if (urlError || urlErrorDescription) {
         console.error('[Auth Callback] URL contains Auth Error:', urlErrorDescription || urlError);
-        setScreen('auth');
+        if (isRecovery) {
+          setScreen('reset_password');
+        } else {
+          setScreen('auth');
+        }
       }
     }
 
@@ -838,6 +872,19 @@ export function App() {
         id: user.id,
         provider: user.app_metadata?.provider || 'email',
       });
+
+      const isRecoveryFlow =
+        screenRef.current === 'reset_password' ||
+        window.location.pathname.includes('/reset-password') ||
+        window.location.hash.includes('type=recovery') ||
+        window.location.search.includes('type=recovery') ||
+        sourceEvent === 'PASSWORD_RECOVERY';
+
+      if (isRecoveryFlow) {
+        console.log('[Auth Flow] Password recovery flow active. Maintaining reset_password screen.');
+        setScreen('reset_password');
+        return;
+      }
 
       const isUserAdmin = Boolean(user.email && isAdminEmail(user.email));
 
@@ -947,7 +994,7 @@ export function App() {
       const user = session?.user ?? null;
       setCurrentUser(user);
 
-      if (user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION')) {
+      if (user && (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION' || event === 'PASSWORD_RECOVERY')) {
         processAuthUser(user, event);
       } else if (!user) {
         setUserProfile(null);
