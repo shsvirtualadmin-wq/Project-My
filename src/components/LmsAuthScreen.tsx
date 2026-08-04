@@ -40,7 +40,8 @@ type AuthMode =
   | 'signup_verify_code'
   | 'signup_success'
   | 'forgot_success'
-  | 'update_password';
+  | 'update_password'
+  | 'verified_success';
 
 export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack }) => {
   const { logoUrl } = useSiteSettings();
@@ -455,6 +456,8 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
         return;
       }
 
+      // Transition away from code-entry view immediately
+      setMode('verified_success');
       setInfoMsg('Email verified successfully! Signing you in...');
 
       // Auto-authenticate the verified user so Supabase creates/establishes the session
@@ -835,6 +838,25 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
             >
               Back to Sign In
             </button>
+          </div>
+        </div>
+      ) : mode === 'verified_success' ? (
+        /* VERIFIED SUCCESS SCREEN */
+        <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-4 shadow-xl animate-fadeIn">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto mb-1 animate-bounce">
+            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+          </div>
+
+          <div className="space-y-1.5">
+            <h3 className="text-lg font-black text-white">Email Verified Successfully!</h3>
+            <p className="text-xs text-emerald-400 font-bold leading-relaxed">
+              Signing you in to your account...
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-300">
+            <RefreshCw className="w-4 h-4 text-[#F2B90C] animate-spin" />
+            <span>Redirecting to your dashboard...</span>
           </div>
         </div>
       ) : mode === 'signup_success' ? (
