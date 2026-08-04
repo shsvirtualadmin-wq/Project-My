@@ -3702,6 +3702,43 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     `;
   }
 
+  // API Endpoint: Email Diagnostics to verify environment variables in production
+  app.get("/api/email-diagnostics", async (req: express.Request, res: express.Response) => {
+    try {
+      const config = getGmailAuthConfig();
+      
+      const maskEmail = (email: string) => {
+        if (!email || !email.includes("@")) return "MISSING ❌";
+        const [local, domain] = email.split("@");
+        const maskedLocal = local.length <= 3 ? local[0] + "***" : local.slice(0, 3) + "***";
+        return `${maskedLocal}@${domain}`;
+      };
+
+      const maskPass = (pass: string) => {
+        if (!pass) return "MISSING ❌";
+        return `Set (${pass.length} chars, masked: "${pass.slice(0, 2)}...${pass.slice(-2)}")`;
+      };
+
+      return res.status(200).json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        emailConfig: {
+          isConfigured: config.isConfigured,
+          authTypeSelected: config.isOAuth ? "OAuth2" : config.isPassAuth ? "Gmail App Password (SMTP)" : "NONE (No valid credentials provided) ❌",
+          EMAIL_USER: maskEmail(config.emailUser),
+          EMAIL_APP_PASSWORD: maskPass(config.emailPass),
+          GMAIL_CLIENT_ID: config.clientId ? "Set ✅" : "MISSING ❌",
+          GMAIL_CLIENT_SECRET: config.clientSecret ? "Set ✅" : "MISSING ❌",
+          GMAIL_REFRESH_TOKEN: config.refreshToken ? "Set ✅" : "MISSING ❌",
+          EMAIL_FROM_NAME: config.fromName,
+          targetAdminEmail: "shsvirtualadmin@gmail.com",
+        }
+      });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || "Error running email diagnostics" });
+    }
+  });
+
   // API Endpoint: Send Welcome Email
   app.post("/api/send-welcome-email", async (req: express.Request, res: express.Response) => {
     try {
