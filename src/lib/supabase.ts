@@ -1836,6 +1836,88 @@ export async function fetchAllStudyBuddyHistoryFromSupabase(): Promise<StudyBudd
 }
 
 /**
+ * Inserts a message record into the Supabase study_buddy_history table with full error logging and retry fallback.
+ */
+export async function saveStudyBuddyMessageToSupabase(
+  studentId: string,
+  role: 'user' | 'model',
+  text: string,
+  conversationId?: string
+): Promise<{ success: boolean; error?: string }> {
+  if (!isSupabaseConfigured) {
+    console.warn('[study_buddy_history Insert Warning] Supabase is not configured.');
+    return { success: false, error: 'Supabase is not configured.' };
+  }
+  if (!studentId || !text || text.startsWith('⚠️')) {
+    return { success: false, error: 'Invalid parameters for study_buddy_history insert.' };
+  }
+
+  try {
+    console.log('====================================');
+    console.log('[SUPABASE STUDY_BUDDY_HISTORY INSERT CALL]');
+    console.log('Student ID:', studentId);
+    console.log('Conversation ID:', conversationId || 'N/A');
+    console.log('Role:', role);
+    console.log('Message Text Snippet:', text.slice(0, 80));
+
+    const recordPayload: any = {
+      student_id: studentId,
+      role,
+      message_text: text,
+    };
+    if (conversationId) {
+      recordPayload.conversation_id = conversationId;
+    }
+
+    const { data, error } = await supabase.from('study_buddy_history').insert(recordPayload).select();
+
+    if (error) {
+      console.error('[SUPABASE STUDY_BUDDY_HISTORY INSERT ERROR]:', {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+
+      // Retry with fallback message_text containing [CID] tag in case conversation_id column is missing
+      const fallbackText = conversationId ? `[CID:${conversationId}] ${text}` : text;
+      console.log('[study_buddy_history] Attempting fallback insert without conversation_id column...');
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('study_buddy_history')
+        .insert({
+          student_id: studentId,
+          role,
+          message_text: fallbackText,
+        })
+        .select();
+
+      if (fallbackError) {
+        console.error('[SUPABASE STUDY_BUDDY_HISTORY FALLBACK INSERT ERROR]:', {
+          code: fallbackError.code,
+          message: fallbackError.message,
+          details: fallbackError.details,
+          hint: fallbackError.hint,
+        });
+        return {
+          success: false,
+          error: `Insert failed: ${error.message} (Fallback failed: ${fallbackError.message})`,
+        };
+      }
+
+      console.log('[SUPABASE STUDY_BUDDY_HISTORY FALLBACK INSERT SUCCESS]:', fallbackData);
+      return { success: true };
+    }
+
+    console.log('[SUPABASE STUDY_BUDDY_HISTORY INSERT SUCCESS]:', data);
+    console.log('====================================');
+    return { success: true };
+  } catch (err: any) {
+    console.error('[SUPABASE STUDY_BUDDY_HISTORY EXCEPTION]:', err);
+    return { success: false, error: err?.message || 'Exception during study_buddy_history insert' };
+  }
+}
+
+/**
  * Bulk import MCQs into Supabase mcq_bank table
  */
 export async function bulkImportMcqsToSupabase(

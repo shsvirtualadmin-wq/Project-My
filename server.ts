@@ -3254,70 +3254,215 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     }
   });
 
-  // Gmail SMTP Email Setup
-  let mailTransporter: nodemailer.Transporter | null = null;
-  function getMailTransporter(): nodemailer.Transporter | null {
+  // Gmail SMTP / API Email Setup & Helper Functions
+  function getGmailAuthConfig() {
     const emailUser = getEnvVar("EMAIL_USER");
     const emailPass = getEnvVar("EMAIL_APP_PASSWORD");
-    if (!emailUser || !emailPass) {
+    const clientId = getEnvVar("GMAIL_CLIENT_ID", getEnvVar("GOOGLE_CLIENT_ID", ""));
+    const clientSecret = getEnvVar("GMAIL_CLIENT_SECRET", getEnvVar("GOOGLE_CLIENT_SECRET", ""));
+    const refreshToken = getEnvVar("GMAIL_REFRESH_TOKEN", getEnvVar("GOOGLE_REFRESH_TOKEN", ""));
+    const accessToken = getEnvVar("GMAIL_ACCESS_TOKEN", getEnvVar("GOOGLE_ACCESS_TOKEN", ""));
+    const fromName = getEnvVar("EMAIL_FROM_NAME", "Boardly Support");
+
+    const isPassAuth = Boolean(emailUser && emailPass);
+    const isOAuth = Boolean(emailUser && clientId && refreshToken);
+
+    return {
+      emailUser,
+      emailPass,
+      clientId,
+      clientSecret,
+      refreshToken,
+      accessToken,
+      fromName,
+      isPassAuth,
+      isOAuth,
+      isConfigured: isPassAuth || isOAuth,
+    };
+  }
+
+  let mailTransporter: nodemailer.Transporter | null = null;
+  function getMailTransporter(): nodemailer.Transporter | null {
+    const config = getGmailAuthConfig();
+
+    console.log("====================================");
+    console.log("[GMAIL SMTP / API CONFIGURATION DIAGNOSTICS]");
+    console.log(`- EMAIL_USER: ${config.emailUser ? `Set ("${config.emailUser}")` : "MISSING ❌"}`);
+    console.log(`- EMAIL_APP_PASSWORD: ${config.emailPass ? `Set (${config.emailPass.length} chars, masked: "${config.emailPass.slice(0, 3)}...${config.emailPass.slice(-3)}")` : "MISSING ❌"}`);
+    console.log(`- GMAIL_CLIENT_ID: ${config.clientId ? "Set" : "Not Set"}`);
+    console.log(`- GMAIL_CLIENT_SECRET: ${config.clientSecret ? "Set" : "Not Set"}`);
+    console.log(`- GMAIL_REFRESH_TOKEN: ${config.refreshToken ? "Set" : "Not Set"}`);
+    console.log(`- GMAIL_ACCESS_TOKEN: ${config.accessToken ? "Set" : "Not Set"}`);
+    console.log(`- EMAIL_FROM_NAME: "${config.fromName}"`);
+    console.log(`- Authentication Type Selected: ${config.isOAuth ? "OAuth2" : config.isPassAuth ? "Gmail App Password (SMTP)" : "NONE (No valid credentials provided)"}`);
+    console.log("====================================");
+
+    if (!config.isConfigured) {
+      console.warn("[getMailTransporter Warning]: Neither App Password nor OAuth2 credentials are completely configured.");
       return null;
     }
+
     if (!mailTransporter) {
-      mailTransporter = nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-          user: emailUser,
-          pass: emailPass,
-        },
-      });
+      if (config.isOAuth) {
+        console.log("[getMailTransporter] Initializing Nodemailer with Gmail OAuth2 transport...");
+        mailTransporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            type: "OAuth2",
+            user: config.emailUser,
+            clientId: config.clientId,
+            clientSecret: config.clientSecret,
+            refreshToken: config.refreshToken,
+            accessToken: config.accessToken || undefined,
+          },
+        });
+      } else {
+        console.log("[getMailTransporter] Initializing Nodemailer with Gmail App Password transport...");
+        mailTransporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: config.emailUser,
+            pass: config.emailPass,
+          },
+        });
+      }
     }
+
     return mailTransporter;
   }
 
-  async function sendEmail({ to, subject, html }: { to: string; subject: string; html: string }): Promise<{ success: boolean; id?: string; error?: string }> {
-    try {
-      const transporter = getMailTransporter();
-      if (!transporter) {
-        const emailUser = getEnvVar("EMAIL_USER");
-        const emailPass = getEnvVar("EMAIL_APP_PASSWORD");
-        console.log(`[Gmail SMTP Config Warning] EMAIL_USER: ${emailUser ? "Set" : "Missing"}, EMAIL_APP_PASSWORD: ${emailPass ? "Set" : "Missing"}`);
-        console.log(`[Email Mock / Credentials Missing] To: ${to} | Subject: ${subject}`);
-        return { success: true, id: "mock_gmail_disabled" };
-      }
-      const fromUser = getEnvVar("EMAIL_USER");
-      const fromName = getEnvVar("EMAIL_FROM_NAME", "Boardly Support");
-      const from = `"${fromName}" <${fromUser}>`;
+  async function sendEmail({
+    to,
+    subject,
+    html,
+  }: {
+    to: string;
+    subject: string;
+    html: string;
+  }): Promise<{ success: boolean; id?: string; error?: string; details?: any }> {
+    console.log("====================================");
+    console.log("[SEND EMAIL INVOKED]");
+    console.log(`Recipient (To): ${to}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Timestamp: ${new Date().toISOString()}`);
 
+    const config = getGmailAuthConfig();
+    const transporter = getMailTransporter();
+
+    if (!transporter || !config.emailUser) {
+      const errorMsg = `Gmail SMTP credentials are missing or unconfigured. EMAIL_USER: ${config.emailUser ? "Set" : "Missing"}, EMAIL_APP_PASSWORD: ${config.emailPass ? "Set" : "Missing"}`;
+      console.error(`[sendEmail ERROR] ${errorMsg}`);
+      console.log("====================================");
+      return { success: false, error: errorMsg };
+    }
+
+    // Confirm "From" address matches authenticated Gmail user
+    const fromName = config.fromName || "Boardly Support";
+    const fromAddress = `"${fromName}" <${config.emailUser}>`;
+
+    console.log(`From Address Header: ${fromAddress}`);
+    console.log(`Authenticated Gmail Account: ${config.emailUser}`);
+
+    if (!fromAddress.includes(config.emailUser)) {
+      console.warn(`[Gmail From Address Warning] The From address ("${fromAddress}") does not contain the authenticated user ("${config.emailUser}"). Gmail SMTP strictly requires the From address to match the authenticated Gmail account or an authorized alias.`);
+    } else {
+      console.log(`✅ [From Address Verification] Passed — From address matches authenticated user (${config.emailUser}).`);
+    }
+
+    try {
+      console.log(`[sendEmail] Attempting to dispatch email via Nodemailer to ${to}...`);
       const info = await transporter.sendMail({
-        from,
+        from: fromAddress,
         to,
         subject,
         html,
       });
-      console.log(`[Gmail SMTP Email Sent Successfully] Message ID: ${info.messageId} | To: ${to}`);
-      return { success: true, id: info.messageId };
+
+      console.log("✅ [Gmail SMTP Email Sent Successfully]");
+      console.log(`Message ID: ${info.messageId}`);
+      console.log(`Accepted: ${JSON.stringify(info.accepted)}`);
+      console.log(`Rejected: ${JSON.stringify(info.rejected)}`);
+      console.log(`Response: ${info.response}`);
+      console.log("====================================");
+
+      return { success: true, id: info.messageId, details: info };
     } catch (err: any) {
-      console.error("[sendEmail Exception (Gmail SMTP)]:", err);
-      return { success: false, error: err?.message || "Email dispatch failed." };
+      console.error("====================================");
+      console.error("❌ [sendEmail EXCEPTION (Gmail SMTP / API Failure)]");
+      console.error(`Error Message: ${err?.message}`);
+      console.error(`Error Code: ${err?.code || "N/A"}`);
+      console.error(`Error Command: ${err?.command || "N/A"}`);
+      console.error(`Error Response Code: ${err?.responseCode || "N/A"}`);
+      console.error(`Error Response: ${err?.response || "N/A"}`);
+      if (err?.stack) {
+        console.error(`Stack Trace:\n${err.stack}`);
+      }
+
+      // Specific error diagnostics for Google OAuth & App Password failure modes
+      let userFriendlyError = err?.message || "Email dispatch failed.";
+
+      if (err?.message?.includes("invalid_grant") || err?.message?.includes("Invalid Credentials") || err?.code === "EAUTH") {
+        userFriendlyError = `Authentication failed for ${config.emailUser}. If using OAuth2, the refresh token may have expired or been revoked (common if the GCP OAuth app is in 'Testing' mode where refresh tokens expire after 7 days). If using an App Password, ensure 2FA is enabled and a fresh 16-character Gmail App Password is set without spaces.`;
+        console.error(`🔍 [DIAGNOSTIC HINT]: ${userFriendlyError}`);
+      } else if (err?.responseCode === 535 || err?.message?.includes("535 5.7.8")) {
+        userFriendlyError = `Gmail SMTP Auth Failed (535 5.7.8). Please check your EMAIL_USER (${config.emailUser}) and EMAIL_APP_PASSWORD. Note: Your regular Gmail password will NOT work; you must generate a 16-character App Password at https://myaccount.google.com/apppasswords.`;
+        console.error(`🔍 [DIAGNOSTIC HINT]: ${userFriendlyError}`);
+      } else if (err?.responseCode === 550 || err?.message?.includes("quota") || err?.message?.includes("Rate limit")) {
+        userFriendlyError = `Gmail sending quota exceeded or recipient address rejected (${config.emailUser}). Gmail free accounts have a limit of 500 emails/day.`;
+        console.error(`🔍 [DIAGNOSTIC HINT]: ${userFriendlyError}`);
+      } else if (err?.code === "ESOCKET" || err?.code === "ETIMEDOUT" || err?.code === "ECONNREFUSED") {
+        userFriendlyError = `Network / Connection timeout reaching Gmail SMTP server (smtp.gmail.com). Error code: ${err.code}`;
+        console.error(`🔍 [DIAGNOSTIC HINT]: ${userFriendlyError}`);
+      }
+
+      console.error("====================================");
+
+      return {
+        success: false,
+        error: userFriendlyError,
+        details: {
+          code: err?.code,
+          responseCode: err?.responseCode,
+          response: err?.response,
+          command: err?.command,
+          rawMessage: err?.message,
+        },
+      };
     }
   }
 
-  // API Endpoint to send test email using Gmail SMTP credentials
+  // API Endpoint to test Gmail SMTP credentials & send diagnostic test email
   app.post("/api/test-email", async (req: express.Request, res: express.Response) => {
     try {
       const { to, subject, message } = req.body || {};
-      const targetEmail = to || getEnvVar("EMAIL_USER");
+      const config = getGmailAuthConfig();
+      const targetEmail = to || config.emailUser;
+
       if (!targetEmail) {
-        return res.status(400).json({ success: false, error: "Missing target email ('to') and EMAIL_USER environment variable is not set." });
+        return res.status(400).json({
+          success: false,
+          error: "Missing target email ('to') and EMAIL_USER environment variable is not set.",
+          config: {
+            EMAIL_USER: Boolean(config.emailUser),
+            EMAIL_APP_PASSWORD: Boolean(config.emailPass),
+            GMAIL_CLIENT_ID: Boolean(config.clientId),
+            GMAIL_REFRESH_TOKEN: Boolean(config.refreshToken),
+          }
+        });
       }
 
-      const emailSubject = subject || "Boardly Test Email - Gmail SMTP";
+      const emailSubject = subject || "Boardly Test Email - Gmail SMTP Diagnostic";
       const emailContent = `
-        <div style="font-family: sans-serif; padding: 20px; color: #111;">
-          <h2>Boardly Gmail SMTP Test Email</h2>
-          <p>${message || "This is a test email sent from Boardly using Gmail SMTP (EMAIL_USER & EMAIL_APP_PASSWORD)."}</p>
-          <hr />
-          <p style="font-size: 12px; color: #666;">Sent at ${new Date().toISOString()}</p>
+        <div style="font-family: sans-serif; padding: 20px; color: #111; max-width: 600px; border: 1px solid #e0e0e0; border-radius: 8px;">
+          <h2 style="color: #4F46E5;">Boardly Gmail SMTP Test Email</h2>
+          <p>${message || "This is a diagnostic test email sent from Boardly using Gmail SMTP credentials."}</p>
+          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;" />
+          <ul style="font-size: 13px; color: #555; padding-left: 20px;">
+            <li><strong>Authenticated Account:</strong> ${config.emailUser || "Not set"}</li>
+            <li><strong>Auth Type:</strong> ${config.isOAuth ? "OAuth2" : "App Password"}</li>
+            <li><strong>From Header:</strong> "${config.fromName}" &lt;${config.emailUser}&gt;</li>
+            <li><strong>Timestamp:</strong> ${new Date().toISOString()}</li>
+          </ul>
         </div>
       `;
 
@@ -3328,13 +3473,24 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       });
 
       if (!result.success) {
-        return res.status(500).json({ success: false, error: result.error });
+        return res.status(500).json({
+          success: false,
+          error: result.error,
+          details: result.details,
+          config: {
+            EMAIL_USER: config.emailUser ? `Set (${config.emailUser})` : "Missing",
+            EMAIL_APP_PASSWORD: config.emailPass ? `Set (${config.emailPass.length} chars)` : "Missing",
+            GMAIL_CLIENT_ID: Boolean(config.clientId),
+            GMAIL_REFRESH_TOKEN: Boolean(config.refreshToken),
+          },
+        });
       }
 
       return res.status(200).json({
         success: true,
         message: `Test email sent successfully to ${targetEmail}`,
         id: result.id,
+        details: result.details,
       });
     } catch (err: any) {
       console.error("[api/test-email Error]:", err);

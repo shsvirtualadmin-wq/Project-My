@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   apiFetch,
   supabase,
+  saveStudyBuddyMessageToSupabase,
   StudentProfile,
 } from '../lib/supabase';
 import { sanitizeStudyBuddyText, isGarbledResponse } from '../lib/studyBuddySanitizer';
@@ -221,23 +222,15 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
       const { data: { session } } = await supabase.auth.getSession();
       if (session?.user?.id) {
         const targetConvId = conversationIdRef.current || conversationId;
-        const { error } = await supabase.from('study_buddy_history').insert({
-          student_id: session.user.id,
-          conversation_id: targetConvId,
-          role,
-          message_text: text,
-        });
-
-        if (error) {
-          await supabase.from('study_buddy_history').insert({
-            student_id: session.user.id,
-            role,
-            message_text: `[CID:${targetConvId}] ${text}`,
-          });
+        const res = await saveStudyBuddyMessageToSupabase(session.user.id, role, text, targetConvId);
+        if (!res.success) {
+          console.error('[StudyBuddyModal] Failed to save message to study_buddy_history:', res.error);
         }
+      } else {
+        console.warn('[StudyBuddyModal] Cannot save message to study_buddy_history: No active session/user ID.');
       }
     } catch (err) {
-      console.warn('Failed to save message to study_buddy_history:', err);
+      console.error('[StudyBuddyModal Exception] Exception in saveMessageToSupabase:', err);
     }
   };
 
