@@ -3660,6 +3660,23 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       inMemoryVerificationCodes.delete(normEmail);
       console.log(`✅ [VERIFICATION CODE VERIFIED] Standardized 6-digit code verified successfully for ${normEmail}`);
 
+      // If Supabase Admin client is available, mark user email as confirmed in Supabase Auth
+      try {
+        const adminClient = getSupabaseAdminClient();
+        if (adminClient) {
+          const { data: usersData } = await adminClient.auth.admin.listUsers();
+          const targetUser = usersData?.users?.find((u: any) => u.email?.toLowerCase() === normEmail);
+          if (targetUser) {
+            await adminClient.auth.admin.updateUserById(targetUser.id, {
+              email_confirm: true,
+            });
+            console.log(`✅ [Supabase Auth] Confirmed email for user ${targetUser.id} (${normEmail})`);
+          }
+        }
+      } catch (subErr: any) {
+        console.warn(`[Supabase Auth Confirm Warning]:`, subErr?.message || subErr);
+      }
+
       return res.status(200).json({
         success: true,
         message: "Verification code verified successfully.",

@@ -278,35 +278,86 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           </div>
         </div>
 
-        {/* Greeting Banner */}
-        <div className="space-y-2 relative z-10">
-          <div className="flex items-center gap-2 text-xs font-extrabold text-[#D99A00] dark:text-[#F2B90C] uppercase tracking-wider">
-            <Sparkles className="w-4 h-4" />
-            <span>Student Dashboard</span>
+        {/* Greeting Banner & XP Progress Ring */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+          <div className="space-y-2 flex-1">
+            <div className="flex items-center gap-2 text-xs font-extrabold text-[#D99A00] dark:text-[#F2B90C] uppercase tracking-wider">
+              <Sparkles className="w-4 h-4" />
+              <span>Student Dashboard</span>
+            </div>
+            <h2 className="font-['Space_Grotesk'] text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
+              Welcome back, {studentName}! 👋
+            </h2>
+            <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed font-normal">
+              Track your FBISE board exam practice performance, review chapter accuracy, and practice targeted MCQs.
+            </p>
           </div>
-          <h2 className="font-['Space_Grotesk'] text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white leading-tight">
-            Welcome back, {studentName}! 👋
-          </h2>
-          <p className="text-slate-600 dark:text-slate-300 text-xs sm:text-sm leading-relaxed font-normal">
-            Track your FBISE board exam practice performance, review chapter accuracy, and practice targeted MCQs.
-          </p>
+
+          {/* XP Circular Progress Ring */}
+          <div className="flex items-center gap-3.5 bg-slate-100/80 dark:bg-black/40 border border-slate-200 dark:border-white/10 p-3 sm:p-3.5 rounded-2xl shrink-0 self-start sm:self-center shadow-inner">
+            <div className="relative w-16 h-16 flex items-center justify-center shrink-0">
+              <svg className="w-16 h-16 transform -rotate-90" viewBox="0 0 64 64">
+                {/* Background Ring */}
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="26"
+                  className="text-slate-200 dark:text-white/10"
+                  strokeWidth="5"
+                  stroke="currentColor"
+                  fill="transparent"
+                />
+                {/* Progress Ring */}
+                <circle
+                  cx="32"
+                  cy="32"
+                  r="26"
+                  className="text-[#F2B90C] transition-all duration-1000 ease-out"
+                  strokeWidth="5"
+                  strokeDasharray={163.36}
+                  strokeDashoffset={163.36 - (163.36 * progressToNextLevel) / 100}
+                  strokeLinecap="round"
+                  stroke="currentColor"
+                  fill="transparent"
+                />
+              </svg>
+              {/* Level Center Icon */}
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+                <span className="text-[10px] font-extrabold text-slate-500 dark:text-slate-400 leading-none">LVL</span>
+                <span className="text-base font-black text-slate-900 dark:text-white font-['Space_Grotesk'] leading-tight">{currentLevel}</span>
+              </div>
+            </div>
+
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 text-xs font-black text-slate-900 dark:text-white font-['Space_Grotesk']">
+                <Award className="w-4 h-4 text-[#F2B90C] fill-[#F2B90C]/20" />
+                <span>{currentXP.toLocaleString()} total XP</span>
+              </div>
+              <p className="text-[11px] font-bold text-[#D99A00] dark:text-[#F2B90C]">
+                {Math.round(progressToNextLevel)}% to Level {currentLevel + 1}
+              </p>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                +50 XP/test • +10 XP/correct
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* XP & Level Progress */}
-        <div className="relative z-10 pt-1 pb-2">
-          <div className="flex items-center justify-between text-xs mb-2">
+        {/* XP & Level Progress Linear Bar */}
+        <div className="relative z-10 pt-1 pb-1">
+          <div className="flex items-center justify-between text-xs mb-1.5">
             <span className="font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-              <Award className="w-4 h-4 text-[#F2B90C]" />
-              Level {currentLevel}
+              <Zap className="w-3.5 h-3.5 text-[#F2B90C] fill-[#F2B90C]" />
+              Level {currentLevel} Progress
             </span>
-            <span className="font-extrabold text-[#D99A00] dark:text-[#F2B90C]">
+            <span className="font-extrabold text-[#D99A00] dark:text-[#F2B90C] font-['Space_Grotesk']">
               {currentXP} / {xpForNextLevel} XP
             </span>
           </div>
-          <div className="h-2.5 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden shadow-inner">
+          <div className="h-3 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden shadow-inner p-0.5 border border-slate-300/50 dark:border-white/5">
             <div 
-              className="h-full bg-gradient-to-r from-[#F2B90C] to-[#F5D166] rounded-full transition-all duration-1000 ease-out"
-              style={{ width: `${progressToNextLevel}%` }}
+              className="h-full bg-gradient-to-r from-[#F2B90C] via-[#F5D166] to-[#F2B90C] rounded-full transition-all duration-1000 ease-out shadow-sm"
+              style={{ width: `${Math.max(4, progressToNextLevel)}%` }}
             />
           </div>
         </div>

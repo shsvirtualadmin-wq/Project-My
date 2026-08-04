@@ -456,9 +456,36 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
       }
 
       setInfoMsg('Email verified successfully! Signing you in...');
+
+      // Auto-authenticate the verified user so Supabase creates/establishes the session
+      const cleanEmail = email.trim();
+      let hasActiveSession = false;
+
+      if (password) {
+        console.log('[handleVerifyOtp] Authenticating verified user with password...');
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+          email: cleanEmail,
+          password: password,
+        });
+
+        if (!signInErr && signInData?.session) {
+          console.log('✅ [handleVerifyOtp] User authenticated successfully:', signInData.session.user.email);
+          hasActiveSession = true;
+        } else if (signInErr) {
+          console.warn('[handleVerifyOtp] Password auth attempt post-verification warning:', signInErr.message);
+        }
+      }
+
+      if (!hasActiveSession) {
+        const { data: sessData } = await supabase.auth.getSession();
+        if (sessData?.session) {
+          hasActiveSession = true;
+        }
+      }
+
       setTimeout(() => {
         onSuccess();
-      }, 1200);
+      }, 800);
     } catch (err: any) {
       console.error('Verify OTP error:', err);
       setError(formatSupabaseAuthError(err, 'signup'));
@@ -744,7 +771,7 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
             {otpDigits.map((digit, index) => (
               <input
                 key={index}
-                ref={(el) => (otpInputRefs.current[index] = el)}
+                ref={(el) => { otpInputRefs.current[index] = el; }}
                 type="text"
                 inputMode="numeric"
                 maxLength={1}
