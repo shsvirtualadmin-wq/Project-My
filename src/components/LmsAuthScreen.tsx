@@ -4,7 +4,6 @@ import {
   isSupabaseConfigured,
   formatSupabaseAuthError,
   resendVerificationEmail,
-  verifySignupOtp,
 } from '../lib/supabase';
 import {
   AlertCircle,
@@ -18,12 +17,10 @@ import {
   Send,
   KeyRound,
   Sparkles,
-  ExternalLink,
-  Hash,
   RefreshCw,
-  ArrowRight,
 } from 'lucide-react';
 import { useSiteSettings } from '../context/SiteSettingsContext';
+import { StudentRegistrationFlow } from './StudentRegistrationFlow';
 
 interface LmsAuthScreenProps {
   onSuccess: () => void;
@@ -35,13 +32,9 @@ type AuthMode =
   | 'signin'
   | 'signup'
   | 'forgot'
-  | 'signup_choose_method'
   | 'signup_verify_link'
-  | 'signup_verify_code'
-  | 'signup_success'
   | 'forgot_success'
-  | 'update_password'
-  | 'verified_success';
+  | 'update_password';
 
 export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack }) => {
   const { logoUrl } = useSiteSettings();
@@ -60,10 +53,6 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
   const [error, setError] = useState<string | null>(null);
   const [infoMsg, setInfoMsg] = useState<string | null>(null);
 
-  // OTP 6-Digit Code State & Element Refs
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -80,57 +69,6 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
   }, []);
 
   const isValidEmail = (val: string) => /\S+@\S+\.\S+/.test(val.trim());
-
-  // Handle 6-Digit OTP digit input change
-  const handleOtpChange = (index: number, val: string) => {
-    const digit = val.replace(/\D/g, '').slice(-1);
-    const updated = [...otpDigits];
-    updated[index] = digit;
-    setOtpDigits(updated);
-    setError(null);
-
-    // Focus next input box if digit typed
-    if (digit && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-
-    // Auto-verify if all 6 digits are populated
-    const fullCode = updated.join('');
-    if (fullCode.length === 6 && !updated.includes('')) {
-      handleVerifyOtp(fullCode);
-    }
-  };
-
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace') {
-      if (!otpDigits[index] && index > 0) {
-        const updated = [...otpDigits];
-        updated[index - 1] = '';
-        setOtpDigits(updated);
-        otpInputRefs.current[index - 1]?.focus();
-      }
-    }
-  };
-
-  const handleOtpPaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    if (!pastedData) return;
-
-    const newDigits = ['', '', '', '', '', ''];
-    for (let i = 0; i < pastedData.length; i++) {
-      newDigits[i] = pastedData[i];
-    }
-    setOtpDigits(newDigits);
-    setError(null);
-
-    const focusIndex = Math.min(pastedData.length, 5);
-    otpInputRefs.current[focusIndex]?.focus();
-
-    if (pastedData.length === 6) {
-      handleVerifyOtp(pastedData);
-    }
-  };
 
   // 1. Google OAuth Flow
   const handleGoogleSignIn = async () => {
@@ -289,8 +227,8 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
           // Direct login without verification requirement
           onSuccess();
         } else {
-          // Email confirmation required -> show verification method chooser screen
-          setMode('signup_choose_method');
+          // Email confirmation required -> show standard link confirmation screen
+          setMode('signup_verify_link');
         }
       }
     } catch (err: any) {
@@ -301,18 +239,10 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
     }
   };
 
-  // Select Verification Method from choice screen
-  const handleSelectVerificationMethod = async (method: 'link' | 'code') => {
+  // Resend confirmation email link
+  const handleResendVerificationLink = async () => {
     const trimmedEmail = email.trim();
-    console.log('====================================');
-    console.log('[SELECT VERIFICATION METHOD CLICKED]');
-    console.log('Method:', method);
-    console.log('Email variable value:', `"${email}"`);
-    console.log('Trimmed Email value:', `"${trimmedEmail}"`);
-    console.log('====================================');
-
     if (!trimmedEmail) {
-      console.error('[SELECT VERIFICATION METHOD ERROR]: Email is empty or undefined!');
       setError('Missing email address. Please try signing up again.');
       return;
     }
@@ -322,175 +252,14 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
     setInfoMsg(null);
 
     try {
-      console.log('[SELECT VERIFICATION METHOD] Calling resendVerificationEmail...');
       const res = await resendVerificationEmail(trimmedEmail);
-      console.log('[SELECT VERIFICATION METHOD] resendVerificationEmail Result:', res);
-
       if (!res.success) {
-        setError(res.error || 'Failed to send verification email. Please try again.');
+        setError(res.error || 'Failed to resend confirmation email.');
         return;
       }
-
-      if (method === 'link') {
-        setMode('signup_verify_link');
-        setInfoMsg('Verification email sent with link! Please check your inbox.');
-      } else {
-        setMode('signup_verify_code');
-        setOtpDigits(['', '', '', '', '', '']);
-        setInfoMsg('Verification email sent with 6-digit code! Please check your inbox.');
-      }
+      setInfoMsg('Fresh confirmation link sent to your email!');
     } catch (err: any) {
-      console.error('Method selection error:', err);
-      setError(formatSupabaseAuthError(err, 'signup'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Switch Verification Method from link to code or code to link
-  const handleSwitchVerificationMethod = async (targetMethod: 'link' | 'code') => {
-    const trimmedEmail = email.trim();
-    console.log('====================================');
-    console.log('[SWITCH VERIFICATION METHOD CLICKED]');
-    console.log('Target Method:', targetMethod);
-    console.log('Email variable value:', `"${email}"`);
-    console.log('Trimmed Email value:', `"${trimmedEmail}"`);
-    console.log('====================================');
-
-    if (!trimmedEmail) {
-      console.error('[SWITCH VERIFICATION METHOD ERROR]: Email is empty or undefined!');
-      setError('Missing email address. Please try signing up again.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setInfoMsg(null);
-
-    try {
-      console.log('[SWITCH VERIFICATION METHOD] Calling resendVerificationEmail...');
-      const res = await resendVerificationEmail(trimmedEmail);
-      console.log('[SWITCH VERIFICATION METHOD] resendVerificationEmail Result:', res);
-
-      if (!res.success) {
-        setError(res.error || 'Failed to resend verification email.');
-        return;
-      }
-
-      if (targetMethod === 'link') {
-        setMode('signup_verify_link');
-        setInfoMsg('Switched to link verification. Fresh email sent to your inbox!');
-      } else {
-        setMode('signup_verify_code');
-        setOtpDigits(['', '', '', '', '', '']);
-        setInfoMsg('Switched to 6-digit code verification. Fresh email sent to your inbox!');
-      }
-    } catch (err: any) {
-      console.error('Switch method error:', err);
-      setError(formatSupabaseAuthError(err, 'signup'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Resend email on current method screen
-  const handleResendSameMethod = async (currentMethod: 'link' | 'code') => {
-    const trimmedEmail = email.trim();
-    console.log('====================================');
-    console.log('[RESEND BUTTON CLICKED]');
-    console.log('Current Method:', currentMethod);
-    console.log('Email variable value:', `"${email}"`);
-    console.log('Trimmed Email value:', `"${trimmedEmail}"`);
-    console.log('====================================');
-
-    if (!trimmedEmail) {
-      console.error('[RESEND BUTTON ERROR]: Email is empty or undefined!');
-      setError('Missing email address. Please try signing up again.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setInfoMsg(null);
-
-    try {
-      console.log('[RESEND BUTTON] Calling resendVerificationEmail...');
-      const res = await resendVerificationEmail(trimmedEmail);
-      console.log('[RESEND BUTTON] resendVerificationEmail Result:', res);
-
-      if (!res.success) {
-        setError(res.error || 'Failed to resend verification email.');
-        return;
-      }
-
-      if (currentMethod === 'code') {
-        setOtpDigits(['', '', '', '', '', '']);
-        setInfoMsg('Fresh 6-digit code sent to your inbox!');
-      } else {
-        setInfoMsg('Fresh verification link sent to your inbox!');
-      }
-    } catch (err: any) {
-      console.error('Resend error:', err);
-      setError(formatSupabaseAuthError(err, 'signup'));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Verify 6-digit OTP Code
-  const handleVerifyOtp = async (codeToVerify?: string) => {
-    const code = codeToVerify || otpDigits.join('').trim();
-    if (!code || code.length < 6) {
-      setError('Please enter the full 6-digit verification code.');
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    setInfoMsg(null);
-
-    try {
-      const result = await verifySignupOtp(email, code);
-      if (!result.success) {
-        setError(result.error || 'Verification failed. Please check the 6 digits and try again.');
-        return;
-      }
-
-      // Transition away from code-entry view immediately
-      setMode('verified_success');
-      setInfoMsg('Email verified successfully! Signing you in...');
-
-      // Auto-authenticate the verified user so Supabase creates/establishes the session
-      const cleanEmail = email.trim();
-      let hasActiveSession = false;
-
-      if (password) {
-        console.log('[handleVerifyOtp] Authenticating verified user with password...');
-        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-          email: cleanEmail,
-          password: password,
-        });
-
-        if (!signInErr && signInData?.session) {
-          console.log('✅ [handleVerifyOtp] User authenticated successfully:', signInData.session.user.email);
-          hasActiveSession = true;
-        } else if (signInErr) {
-          console.warn('[handleVerifyOtp] Password auth attempt post-verification warning:', signInErr.message);
-        }
-      }
-
-      if (!hasActiveSession) {
-        const { data: sessData } = await supabase.auth.getSession();
-        if (sessData?.session) {
-          hasActiveSession = true;
-        }
-      }
-
-      setTimeout(() => {
-        onSuccess();
-      }, 800);
-    } catch (err: any) {
-      console.error('Verify OTP error:', err);
+      console.error('Resend link error:', err);
       setError(formatSupabaseAuthError(err, 'signup'));
     } finally {
       setLoading(false);
@@ -614,102 +383,20 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
         </div>
       )}
 
-      {/* 1. VERIFICATION METHOD CHOICE SCREEN */}
-      {mode === 'signup_choose_method' ? (
-        <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 space-y-5 shadow-xl animate-fadeIn">
-          <div className="text-center space-y-1.5">
-            <div className="w-12 h-12 rounded-2xl bg-[#F2B90C]/10 border border-[#F2B90C]/30 text-[#F2B90C] flex items-center justify-center mx-auto mb-2">
-              <Mail className="w-6 h-6" />
-            </div>
-            <h3 className="text-lg font-black text-white leading-tight">
-              How would you like to verify your email?
-            </h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              We'll send a confirmation email to <strong className="text-amber-400">{email}</strong>. Choose how you'd like to verify:
-            </p>
-          </div>
-
-          {/* Method Cards */}
-          <div className="space-y-3 pt-1">
-            {/* Option A: Send me a link */}
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleSelectVerificationMethod('link')}
-              className="w-full bg-[#2A2A2D] hover:bg-[#323236] border border-white/15 hover:border-[#F2B90C]/60 rounded-2xl p-4 text-left transition-all active:scale-[0.98] cursor-pointer group flex items-start gap-3.5"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 border border-[#F2B90C]/30 text-[#F2B90C] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <ExternalLink className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-extrabold text-white group-hover:text-[#F2B90C] transition-colors">
-                    Send me a link
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-[#F2B90C] group-hover:translate-x-0.5 transition-all" />
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                  Click the confirmation button in your email to verify instantly.
-                </p>
-              </div>
-            </button>
-
-            {/* Option B: Send me a code */}
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleSelectVerificationMethod('code')}
-              className="w-full bg-[#2A2A2D] hover:bg-[#323236] border border-white/15 hover:border-[#F2B90C]/60 rounded-2xl p-4 text-left transition-all active:scale-[0.98] cursor-pointer group flex items-start gap-3.5"
-            >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <Hash className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-extrabold text-white group-hover:text-amber-400 transition-colors">
-                    Send me a code
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                  Receive a 6-digit code in your email and type it in here.
-                </p>
-              </div>
-            </button>
-          </div>
-
-          <div className="p-3 bg-white/5 rounded-2xl border border-white/10 text-[11px] text-slate-300 leading-relaxed text-center">
-            💡 Both options hit the same confirmation email. You can switch methods anytime!
-          </div>
-
-          <div className="pt-2 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signin');
-                setError(null);
-                setInfoMsg(null);
-              }}
-              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              Back to Sign In
-            </button>
-          </div>
-        </div>
-      ) : mode === 'signup_verify_link' ? (
-        /* 2. LINK VERIFICATION SCREEN */
+      {mode === 'signup_verify_link' ? (
+        /* LINK VERIFICATION SCREEN */
         <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-4 shadow-xl animate-fadeIn">
           <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto">
             <Mail className="w-6 h-6" />
           </div>
 
           <div className="space-y-1.5">
-            <h3 className="text-base font-extrabold text-white">Check Your Inbox</h3>
+            <h3 className="text-base font-extrabold text-white">Confirm Your Email Address</h3>
             <p className="text-xs text-slate-300 leading-relaxed">
               We sent a confirmation link to <strong className="text-amber-400">{email}</strong>.
             </p>
             <p className="text-[11px] text-slate-400 leading-relaxed pt-0.5">
-              Please check your inbox (and spam folder) and click the link to verify your email address.
+              Please check your inbox (and spam folder) and click the confirmation link to verify your account.
             </p>
           </div>
 
@@ -717,7 +404,7 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
           <button
             type="button"
             disabled={loading}
-            onClick={() => handleResendSameMethod('link')}
+            onClick={handleResendVerificationLink}
             className="w-full bg-[#F2B90C] hover:bg-[#d9a50a] text-[#0A0A0A] font-black py-3 rounded-full text-xs transition-all active:scale-95 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2 shadow-md"
           >
             {loading ? (
@@ -725,196 +412,10 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
             ) : (
               <Send className="w-4 h-4" />
             )}
-            <span>{loading ? 'Sending Link...' : 'Resend Email Link'}</span>
+            <span>{loading ? 'Sending Link...' : 'Resend Confirmation Email'}</span>
           </button>
 
-          {/* Didn't get it? Try the other method */}
-          <div className="pt-2 border-t border-white/10">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleSwitchVerificationMethod('code')}
-              className="inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-400 hover:text-amber-300 hover:underline transition-colors cursor-pointer"
-            >
-              <Hash className="w-3.5 h-3.5" />
-              <span>Didn't get it? Try entering a 6-digit code instead</span>
-            </button>
-          </div>
-
           <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signin');
-                setError(null);
-                setInfoMsg(null);
-              }}
-              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              Back to Sign In
-            </button>
-          </div>
-        </div>
-      ) : mode === 'signup_verify_code' ? (
-        /* 3. CODE VERIFICATION SCREEN (6-digit OTP) */
-        <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-4 shadow-xl animate-fadeIn">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
-            <Hash className="w-6 h-6" />
-          </div>
-
-          <div className="space-y-1">
-            <h3 className="text-base font-extrabold text-white">Enter 6-Digit Verification Code</h3>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              Enter the 6-digit code sent to <strong className="text-amber-400">{email}</strong>:
-            </p>
-          </div>
-
-          {/* 6 Digit Input Fields */}
-          <div className="flex items-center justify-center gap-1.5 sm:gap-2 my-3" onPaste={handleOtpPaste}>
-            {otpDigits.map((digit, index) => (
-              <input
-                key={index}
-                ref={(el) => { otpInputRefs.current[index] = el; }}
-                type="text"
-                inputMode="numeric"
-                maxLength={1}
-                value={digit}
-                onChange={(e) => handleOtpChange(index, e.target.value)}
-                onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                className="w-10 h-12 sm:w-11 sm:h-12 bg-[#0A0A0A] border border-white/20 focus:border-[#F2B90C] focus:ring-2 focus:ring-[#F2B90C]/30 rounded-xl text-center text-xl font-black text-white outline-none transition-all"
-              />
-            ))}
-          </div>
-
-          {/* Action Button */}
-          <button
-            type="button"
-            disabled={loading || otpDigits.join('').length < 6}
-            onClick={() => handleVerifyOtp()}
-            className="w-full bg-[#F2B90C] hover:bg-[#d9a50a] text-[#0A0A0A] font-black py-3 rounded-full text-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 shadow-md"
-          >
-            {loading ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-4 h-4" />
-            )}
-            <span>{loading ? 'Verifying Code...' : 'Verify Code & Sign In'}</span>
-          </button>
-
-          {/* Resend Code Link */}
-          <div className="pt-1">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleResendSameMethod('code')}
-              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              Resend 6-Digit Code
-            </button>
-          </div>
-
-          {/* Didn't get it? Try the other method */}
-          <div className="pt-2 border-t border-white/10">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleSwitchVerificationMethod('link')}
-              className="inline-flex items-center gap-1.5 text-xs font-extrabold text-amber-400 hover:text-amber-300 hover:underline transition-colors cursor-pointer"
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Didn't get it? Try verifying via email link instead</span>
-            </button>
-          </div>
-
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMode('signin');
-                setError(null);
-                setInfoMsg(null);
-              }}
-              className="text-xs font-bold text-slate-400 hover:text-white transition-colors cursor-pointer"
-            >
-              Back to Sign In
-            </button>
-          </div>
-        </div>
-      ) : mode === 'verified_success' ? (
-        /* VERIFIED SUCCESS SCREEN */
-        <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-4 shadow-xl animate-fadeIn">
-          <div className="w-14 h-14 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto mb-1 animate-bounce">
-            <CheckCircle2 className="w-8 h-8 text-emerald-400" />
-          </div>
-
-          <div className="space-y-1.5">
-            <h3 className="text-lg font-black text-white">Email Verified Successfully!</h3>
-            <p className="text-xs text-emerald-400 font-bold leading-relaxed">
-              Signing you in to your account...
-            </p>
-          </div>
-
-          <div className="pt-2 flex items-center justify-center gap-2 text-xs font-semibold text-slate-300">
-            <RefreshCw className="w-4 h-4 text-[#F2B90C] animate-spin" />
-            <span>Redirecting to your dashboard...</span>
-          </div>
-        </div>
-      ) : mode === 'signup_success' ? (
-        <div className="bg-[#1C1C1E] border border-white/10 rounded-3xl p-6 text-center space-y-5 shadow-xl animate-fadeIn">
-          <div className="w-12 h-12 rounded-2xl bg-[#F2B90C]/10 border border-[#F2B90C]/30 text-[#F2B90C] flex items-center justify-center mx-auto mb-2">
-            <Mail className="w-6 h-6" />
-          </div>
-          <h3 className="text-lg font-black text-white leading-tight">
-            How would you like to verify your email?
-          </h3>
-          <p className="text-xs text-slate-300 leading-relaxed">
-            We'll send a confirmation email to <strong className="text-amber-400">{email}</strong>. Choose how you'd like to verify:
-          </p>
-          <div className="space-y-3 pt-1">
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleSelectVerificationMethod('link')}
-              className="w-full bg-[#2A2A2D] hover:bg-[#323236] border border-white/15 hover:border-[#F2B90C]/60 rounded-2xl p-4 text-left transition-all active:scale-[0.98] cursor-pointer group flex items-start gap-3.5"
-            >
-              <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 border border-[#F2B90C]/30 text-[#F2B90C] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <ExternalLink className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-extrabold text-white group-hover:text-[#F2B90C] transition-colors">
-                    Send me a link
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-[#F2B90C] group-hover:translate-x-0.5 transition-all" />
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                  Click the confirmation button in your email to verify instantly.
-                </p>
-              </div>
-            </button>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={() => handleSelectVerificationMethod('code')}
-              className="w-full bg-[#2A2A2D] hover:bg-[#323236] border border-white/15 hover:border-[#F2B90C]/60 rounded-2xl p-4 text-left transition-all active:scale-[0.98] cursor-pointer group flex items-start gap-3.5"
-            >
-              <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
-                <Hash className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-extrabold text-white group-hover:text-amber-400 transition-colors">
-                    Send me a code
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-slate-400 group-hover:text-amber-400 group-hover:translate-x-0.5 transition-all" />
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                  Receive a 6-digit code in your email and type it in here.
-                </p>
-              </div>
-            </button>
-          </div>
-          <div className="pt-2 text-center">
             <button
               type="button"
               onClick={() => {
@@ -1072,8 +573,26 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
             {loading ? 'Updating Password...' : 'Update Password & Sign In'}
           </button>
         </form>
+      ) : mode === 'signup' ? (
+        /* MULTI-STEP REGISTRATION FLOW FOR SIGN UP */
+        <div className="space-y-4">
+          <div className="flex justify-between items-center mb-2">
+            <button
+              type="button"
+              onClick={() => setMode('signin')}
+              className="text-xs font-bold text-slate-400 hover:text-white flex items-center gap-1 cursor-pointer"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Sign In</span>
+            </button>
+          </div>
+          <StudentRegistrationFlow
+            onRegistrationComplete={() => onSuccess()}
+            onSkipToPractice={() => onSuccess()}
+          />
+        </div>
       ) : (
-        /* MAIN SIGN IN / SIGN UP VIEW */
+        /* MAIN SIGN IN VIEW */
         <div className="space-y-4">
           {/* Continue with Google Button */}
           <button
@@ -1158,41 +677,17 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
                 setError(null);
                 setInfoMsg(null);
               }}
-              className={`flex-1 py-2 text-xs font-bold rounded-full transition-all cursor-pointer ${
-                mode === 'signup'
-                  ? 'bg-[#F2B90C] text-[#0A0A0A] shadow-md font-black'
-                  : 'text-slate-400 hover:text-white'
-              }`}
+              className="flex-1 py-2 text-xs font-bold rounded-full transition-all cursor-pointer text-slate-400 hover:text-white"
             >
               Sign Up
             </button>
           </div>
 
-          {/* FORM: Sign In or Sign Up */}
+          {/* FORM: Sign In */}
           <form
-            onSubmit={mode === 'signin' ? handleEmailSignIn : handleEmailSignUp}
+            onSubmit={handleEmailSignIn}
             className="space-y-3"
           >
-            {/* Full Name field for Sign Up */}
-            {mode === 'signup' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Full Name <span className="text-amber-400">*</span>
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 pointer-events-none" />
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Muhammad Ali"
-                    className="w-full bg-[#1C1C1E] border border-white/15 focus:border-[#F2B90C] focus:ring-1 focus:ring-[#F2B90C] rounded-2xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Email Address */}
             <div>
               <label className="block text-xs font-bold text-slate-300 mb-1">
@@ -1218,29 +713,27 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
                 <label className="text-xs font-bold text-slate-300">
                   Password <span className="text-amber-400">*</span>
                 </label>
-                {mode === 'signin' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMode('forgot');
-                      setError(null);
-                      setInfoMsg(null);
-                    }}
-                    className="text-[11px] font-bold text-amber-400 hover:underline cursor-pointer"
-                  >
-                    Forgot password?
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('forgot');
+                    setError(null);
+                    setInfoMsg(null);
+                  }}
+                  className="text-[11px] font-bold text-amber-400 hover:underline cursor-pointer"
+                >
+                  Forgot password?
+                </button>
               </div>
               <div className="relative">
                 <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 pointer-events-none" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
-                  autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder={mode === 'signup' ? 'Min. 6 characters' : 'Enter password'}
+                  placeholder="Enter password"
                   className="w-full bg-[#1C1C1E] border border-white/15 focus:border-[#F2B90C] focus:ring-1 focus:ring-[#F2B90C] rounded-2xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all"
                 />
                 <button
@@ -1252,34 +745,6 @@ export const LmsAuthScreen: React.FC<LmsAuthScreenProps> = ({ onSuccess, onBack 
                 </button>
               </div>
             </div>
-
-            {/* Confirm Password field for Sign Up */}
-            {mode === 'signup' && (
-              <div>
-                <label className="block text-xs font-bold text-slate-300 mb-1">
-                  Confirm Password <span className="text-amber-400">*</span>
-                </label>
-                <div className="relative">
-                  <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400 pointer-events-none" />
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    required
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter password"
-                    className="w-full bg-[#1C1C1E] border border-white/15 focus:border-[#F2B90C] focus:ring-1 focus:ring-[#F2B90C] rounded-2xl pl-10 pr-10 py-2.5 text-sm text-white placeholder-slate-500 outline-none transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-3.5 top-3.5 text-slate-400 hover:text-slate-200 cursor-pointer"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            )}
 
             {/* Action Submit Button */}
             <button

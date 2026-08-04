@@ -106,12 +106,13 @@ export const onRequestPost = async (context) => {
 
       if (driveRes.ok) {
         uploaded = await driveRes.json();
+        console.log(`✅ [drive-upload.js Succeeded]: File ID ${uploaded.id}`);
       } else {
         driveErrorText = await driveRes.text();
-        console.warn("[drive-upload.js Google Drive API warning]:", driveErrorText);
+        console.error(`❌ [drive-upload.js Google Drive API Error - HTTP ${driveRes.status}]:`, driveErrorText);
       }
     } catch (gErr) {
-      console.warn("[drive-upload.js Drive Upload Exception, switching to Data URL fallback]:", gErr);
+      console.error("❌ [drive-upload.js Drive Upload Exception]:", gErr?.stack || gErr?.message || gErr);
     }
 
     if (uploaded) {

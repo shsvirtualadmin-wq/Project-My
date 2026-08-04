@@ -164,10 +164,10 @@ function cleanAuthMessage(msg: string, context?: 'signup' | 'signin'): string {
     return 'Rate limit exceeded. Please wait a few minutes before trying again.';
   }
   if (lower.includes('token has expired') || lower.includes('otp_expired') || lower.includes('token expired') || lower.includes('code has expired')) {
-    return 'Verification code has expired. Please click "Resend Code" to receive a new code.';
+    return 'Verification link or token has expired. Please request a new confirmation email.';
   }
   if (lower.includes('invalid token') || lower.includes('token is invalid') || lower.includes('invalid otp') || lower.includes('token not found')) {
-    return 'Invalid verification code. Please check the 6 digits and try again.';
+    return 'Invalid verification link or token. Please request a new confirmation email.';
   }
   if (lower.includes('email not confirmed')) {
     return 'Email address not confirmed yet. Please check your inbox for the confirmation link.';
@@ -186,7 +186,7 @@ function cleanAuthMessage(msg: string, context?: 'signup' | 'signin'): string {
 }
 
 /**
- * Resends the signup confirmation email to the specified email address.
+ * Resends the signup confirmation email to the specified email address using Supabase.
  */
 export async function resendVerificationEmail(email: string): Promise<{ success: boolean; error?: string }> {
   if (!isSupabaseConfigured) {
@@ -199,13 +199,6 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
     console.log('Target Email:', email.trim());
     console.log('Redirect URL:', redirectUrl);
 
-    // Asynchronously dispatch 6-digit verification code via fast server endpoint
-    fetch('/api/send-verification-code', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.trim() }),
-    }).catch((e) => console.warn('Custom 6-digit email dispatch warning:', e));
-    
     const { data, error } = await supabase.auth.resend({
       type: 'signup',
       email: email.trim(),
@@ -220,64 +213,11 @@ export async function resendVerificationEmail(email: string): Promise<{ success:
     console.log('====================================');
 
     if (error) {
-      // If Supabase rate-limited or errored, custom backend endpoint already dispatched 6-digit code
-      return { success: true };
+      return { success: false, error: formatSupabaseAuthError(error, 'signup') };
     }
     return { success: true };
   } catch (err: any) {
     console.error('[SUPABASE AUTH RESEND EXCEPTION]:', err);
-    return { success: true };
-  }
-}
-
-/**
- * Verifies a 6-digit OTP code sent during signup confirmation.
- */
-export async function verifySignupOtp(email: string, token: string): Promise<{ success: boolean; session?: any; error?: string }> {
-  if (!isSupabaseConfigured) {
-    return { success: false, error: 'Supabase is not configured.' };
-  }
-  const cleanEmail = email.trim();
-  const cleanToken = token.trim();
-
-  try {
-    console.log('====================================');
-    console.log('[SUPABASE / API AUTH VERIFY OTP CALL]');
-    console.log('Email:', cleanEmail, 'Token:', cleanToken);
-
-    // Try custom 6-digit verification code endpoint first
-    try {
-      const serverRes = await fetch('/api/verify-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail, code: cleanToken }),
-      });
-      const serverJson = await serverRes.json();
-      if (serverRes.ok && serverJson.success) {
-        console.log('✅ [Server 6-Digit Code Verified Successfully]');
-        return { success: true };
-      }
-    } catch (sErr) {
-      console.warn('Server 6-digit verification check fallback:', sErr);
-    }
-    
-    const { data, error } = await supabase.auth.verifyOtp({
-      email: cleanEmail,
-      token: cleanToken,
-      type: 'signup',
-    });
-
-    console.log('[SUPABASE AUTH VERIFY OTP RESPONSE]');
-    console.log('Data:', JSON.stringify(data, null, 2));
-    console.log('Error:', error);
-    console.log('====================================');
-
-    if (error) {
-      return { success: false, error: formatSupabaseAuthError(error, 'signup') };
-    }
-    return { success: true, session: data.session };
-  } catch (err: any) {
-    console.error('[SUPABASE AUTH VERIFY OTP EXCEPTION]:', err);
     return { success: false, error: formatSupabaseAuthError(err, 'signup') };
   }
 }
@@ -991,11 +931,17 @@ export async function saveStudentRegistration(
   userId: string,
   data: {
     name: string;
-    phone: string;
+    phone?: string;
     email: string;
     grade: string;
     stream: string;
-    subjects: string[];
+    subjects?: string[];
+    dream_university?: string;
+    payment_status?: string;
+    payment_method?: string;
+    transaction_reference?: string;
+    drive_file_id?: string;
+    drive_file_url?: string;
   }
 ): Promise<StudentProfile> {
   const isAdmin = Boolean(data.email && data.email.trim().toLowerCase() === 'shsvirtualadmin@gmail.com');
@@ -1028,17 +974,17 @@ export async function saveStudentRegistration(
   const profile: StudentProfile = {
     id: userId,
     name: data.name.trim(),
-    phone: data.phone.trim(),
+    phone: (data.phone || '').trim(),
     email: data.email.trim(),
     grade: data.grade,
     stream: data.stream,
-    subjects: data.subjects,
+    subjects: data.subjects || [],
     sign_up_method: 'Google',
     status: requiresPayment ? 'pending admin approval' : 'active',
     is_registered: true,
     package_name: data.grade === 'MDCAT' ? 'MDCAT Entrance Test Pass' : data.grade === 'TCAT' ? 'TCAT Entrance Test Pass' : 'FBISE Annual Practice Pass',
     enrollment_date: enrollmentDateStr,
-    payment_status: isAdmin || isExistingStudent ? 'Verified & Paid' : 'Unpaid',
+    payment_status: data.payment_status || (isAdmin || isExistingStudent ? 'Verified & Paid' : 'Unpaid'),
     requires_payment: requiresPayment,
     access_expires: expiresDateStr,
     created_at: now.toISOString(),
@@ -2057,14 +2003,20 @@ export interface PaymentRequest {
 }
 
 /**
- * Submit payment proof to backend (uploads screenshot to Drive and records request in DB)
+ * Submit payment proof request details to backend (records request in DB for WhatsApp verification)
  */
-export async function submitPaymentProofApi(formData: FormData): Promise<{ success: boolean; data?: PaymentRequest; error?: string }> {
+export async function submitPaymentProofApi(payload: Record<string, any> | FormData): Promise<{ success: boolean; data?: PaymentRequest; error?: string }> {
   try {
-    const resp = await apiFetch('/api/payment-requests/submit', {
+    const isFormData = payload instanceof FormData;
+    const options: RequestInit = {
       method: 'POST',
-      body: formData,
-    });
+      body: isFormData ? payload : JSON.stringify(payload),
+    };
+    if (!isFormData) {
+      options.headers = { 'Content-Type': 'application/json' };
+    }
+
+    const resp = await apiFetch('/api/payment-requests/submit', options);
     const result = await safeJsonResponse(resp);
     if (resp.ok && result && result.success) {
       return { success: true, data: result.data };

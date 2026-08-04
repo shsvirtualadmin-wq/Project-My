@@ -3131,6 +3131,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
         if (driveRes.ok) {
           const uploaded = await driveRes.json();
+          console.log(`✅ [Google Drive Upload Succeeded]: File ID ${uploaded.id}, Name: ${uploaded.name}`);
           return res.status(200).json({
             success: true,
             id: uploaded.id,
@@ -3142,9 +3143,9 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         }
 
         const errText = await driveRes.text();
-        console.warn("[Drive API Upload Warning]:", errText);
+        console.error(`❌ [Google Drive Upload API Failed - HTTP ${driveRes.status} ${driveRes.statusText}]:`, errText);
       } catch (driveErr: any) {
-        console.warn("[Drive Upload Exception, switching to Data URL fallback]:", driveErr?.message || driveErr);
+        console.error("❌ [Google Drive Upload Exception]:", driveErr?.stack || driveErr?.message || driveErr);
       }
 
       // Fallback Data URL when Drive upload fails or has no quota
@@ -3293,15 +3294,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     return mailTransporter;
   }
 
-  // In-memory store for 6-digit verification codes
-  const inMemoryVerificationCodes = new Map<string, { code: string; expiresAt: number }>();
 
-  // Standardized 6-Digit Code Generator
-  // BEFORE FIX: const verificationCode = Math.floor(10000000 + Math.random() * 90000000).toString(); // 8 digit
-  // AFTER FIX:  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6 digit
-  function generate6DigitCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  }
 
   async function sendEmail({
     to,
@@ -3433,142 +3426,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     });
   }
 
-  // HTML Email Template for 6-Digit Verification Code
-  function generateVerificationCodeEmailHtml({ code, email }: { code: string; email: string }) {
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 20px; color: #f8fafc; }
-          .container { max-width: 520px; margin: 0 auto; background: #1e293b; border-radius: 16px; overflow: hidden; border: 1px solid #334155; }
-          .header { background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); color: #ffffff; padding: 24px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
-          .header p { margin: 4px 0 0; font-size: 13px; opacity: 0.9; }
-          .body { padding: 28px 24px; text-align: center; }
-          .code-box { background: #0f172a; border: 2px dashed #6366f1; border-radius: 12px; padding: 18px 24px; margin: 20px 0; display: inline-block; }
-          .code-text { font-size: 38px; font-weight: 900; letter-spacing: 10px; color: #a855f7; font-family: 'Courier New', Courier, monospace; margin: 0; }
-          .footer { text-align: center; font-size: 12px; color: #64748b; padding: 16px 24px; background: #0f172a; border-top: 1px solid #334155; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Boardly Verification Code</h1>
-            <p>Complete your account verification</p>
-          </div>
-          <div class="body">
-            <p style="font-size: 14px; color: #cbd5e1; margin-top: 0;">Your 6-digit email verification code for <strong>${email}</strong> is:</p>
-            <div class="code-box">
-              <div class="code-text">${code}</div>
-            </div>
-            <p style="font-size: 13px; color: #94a3b8; margin-bottom: 0;">Enter this code in the app to complete verification. This code expires in 15 minutes.</p>
-          </div>
-          <div class="footer">
-            © ${new Date().getFullYear()} Boardly. If you did not request this code, please ignore this email.
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-  }
 
-  // API Endpoint: Send 6-Digit Verification Code (Asynchronous Non-blocking)
-  app.post("/api/send-verification-code", async (req: express.Request, res: express.Response) => {
-    try {
-      const { email } = req.body || {};
-      if (!email || typeof email !== 'string') {
-        return res.status(400).json({ success: false, error: "Valid email address is required." });
-      }
-
-      const normEmail = email.trim().toLowerCase();
-      // Code generation logic: Math.floor(100000 + Math.random() * 900000).toString() -> strictly 6 digits
-      const code = generate6DigitCode();
-      const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
-
-      inMemoryVerificationCodes.set(normEmail, { code, expiresAt });
-      console.log(`[VERIFICATION CODE GENERATED] Generated 6-digit code for ${normEmail}: ${code}`);
-
-      // Asynchronous background fire-and-forget email dispatch
-      sendEmailAsync({
-        to: normEmail,
-        subject: `Your Boardly Verification Code: ${code}`,
-        html: generateVerificationCodeEmailHtml({ code, email: normEmail }),
-      });
-
-      // Immediate response to prevent frontend blocking/waiting
-      return res.status(200).json({
-        success: true,
-        message: "6-digit verification code sent asynchronously.",
-        codeLength: 6,
-      });
-    } catch (err: any) {
-      console.error("[api/send-verification-code Error]:", err);
-      return res.status(500).json({ success: false, error: err?.message || "Failed to send verification code." });
-    }
-  });
-
-  // API Endpoint: Verify 6-Digit Code
-  app.post("/api/verify-code", async (req: express.Request, res: express.Response) => {
-    try {
-      const { email, code } = req.body || {};
-      if (!email || !code) {
-        return res.status(400).json({ success: false, error: "Email and 6-digit verification code are required." });
-      }
-
-      const normEmail = email.trim().toLowerCase();
-      const normCode = String(code).trim();
-
-      if (normCode.length !== 6) {
-        return res.status(400).json({ success: false, error: "Verification code must be exactly 6 digits." });
-      }
-
-      const stored = inMemoryVerificationCodes.get(normEmail);
-
-      if (!stored) {
-        return res.status(400).json({ success: false, error: "No verification code found for this email. Please request a new code." });
-      }
-
-      if (Date.now() > stored.expiresAt) {
-        inMemoryVerificationCodes.delete(normEmail);
-        return res.status(400).json({ success: false, error: "Verification code has expired. Please request a new code." });
-      }
-
-      if (stored.code !== normCode) {
-        return res.status(400).json({ success: false, error: "Invalid verification code. Please check the 6 digits and try again." });
-      }
-
-      // Consumed successfully
-      inMemoryVerificationCodes.delete(normEmail);
-      console.log(`✅ [VERIFICATION CODE VERIFIED] Standardized 6-digit code verified successfully for ${normEmail}`);
-
-      // If Supabase Admin client is available, mark user email as confirmed in Supabase Auth
-      try {
-        const adminClient = getSupabaseAdminClient();
-        if (adminClient) {
-          const { data: usersData } = await adminClient.auth.admin.listUsers();
-          const targetUser = usersData?.users?.find((u: any) => u.email?.toLowerCase() === normEmail);
-          if (targetUser) {
-            await adminClient.auth.admin.updateUserById(targetUser.id, {
-              email_confirm: true,
-            });
-            console.log(`✅ [Supabase Auth] Confirmed email for user ${targetUser.id} (${normEmail})`);
-          }
-        }
-      } catch (subErr: any) {
-        console.warn(`[Supabase Auth Confirm Warning]:`, subErr?.message || subErr);
-      }
-
-      return res.status(200).json({
-        success: true,
-        message: "Verification code verified successfully.",
-      });
-    } catch (err: any) {
-      console.error("[api/verify-code Error]:", err);
-      return res.status(500).json({ success: false, error: err?.message || "Error verifying code." });
-    }
-  });
 
   // HTML Email Templates
   function generateSubmissionConfirmationEmail({ name, method, amount, date }: { name: string; method: string; amount: string | number; date: string }) {
@@ -3737,26 +3595,27 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
           .row { margin-bottom: 8px; font-size: 13px; }
           .label { font-weight: 700; color: #475569; }
           .value { color: #0f172a; }
-          .btn { display: inline-block; background: #059669; color: #ffffff !important; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; margin-top: 12px; }
+          .btn { display: inline-block; background: #25D366; color: #ffffff !important; text-decoration: none; padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 13px; margin-top: 12px; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
             <h1>Boardly Admin Alert</h1>
-            <p style="margin: 4px 0 0; color: #cbd5e1; font-size: 13px;">New Payment Verification Proof Submitted</p>
+            <p style="margin: 4px 0 0; color: #cbd5e1; font-size: 13px;">New WhatsApp Payment Submission</p>
           </div>
           <div class="body">
-            <h2 style="font-size: 16px; margin-top: 0; color: #0f172a;">New Student Payment Proof</h2>
+            <h2 style="font-size: 16px; margin-top: 0; color: #0f172a;">New Student Payment Details Submitted</h2>
             <div class="card">
               <div class="row"><span class="label">Student Name:</span> <span class="value">${name}</span></div>
               <div class="row"><span class="label">Student Email:</span> <span class="value">${email}</span></div>
-              <div class="row"><span class="label">Payment Method:</span> <span class="value">${method}</span></div>
+              <div class="row"><span class="label">Payment Account:</span> <span class="value">${method}</span></div>
               <div class="row"><span class="label">Amount Paid:</span> <span class="value">PKR ${amount}</span></div>
-              <div class="row"><span class="label">Transaction Ref:</span> <span class="value">${transactionRef || 'N/A'}</span></div>
+              <div class="row"><span class="label">Transaction ID / Ref:</span> <span class="value">${transactionRef || 'N/A'}</span></div>
               <div class="row"><span class="label">Submitted At:</span> <span class="value">${date}</span></div>
             </div>
-            ${driveUrl ? `<a href="${driveUrl}" class="btn" target="_blank">View Screenshot on Google Drive</a>` : ''}
+            <p style="font-size: 12px; color: #64748b;">The student will send their payment screenshot via WhatsApp (+923222314436).</p>
+            <a href="https://wa.me/923222314436" class="btn" target="_blank">Open Admin WhatsApp (+923222314436)</a>
           </div>
         </div>
       </body>
@@ -3764,38 +3623,78 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     `;
   }
 
-  function generateWelcomeEmail({ name, email }: { name: string; email: string }) {
+  function generateWelcomeEmail({
+    name,
+    email,
+    selectedTrack,
+    dreamUniversity,
+  }: {
+    name: string;
+    email: string;
+    selectedTrack?: string;
+    dreamUniversity?: string;
+  }) {
     return `
       <!DOCTYPE html>
       <html>
       <head>
         <meta charset="utf-8">
         <style>
-          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; }
-          .container { max-width: 580px; margin: 0 auto; background: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #e2e8f0; }
-          .header { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; padding: 28px 24px; text-align: center; }
-          .header h1 { margin: 0; font-size: 22px; font-weight: 800; color: #f59e0b; }
-          .body { padding: 28px 24px; }
-          .footer { text-align: center; font-size: 12px; color: #94a3b8; padding: 16px 24px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #0f172a; margin: 0; padding: 24px; color: #1e293b; }
+          .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; border: 1px solid #e2e8f0; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+          .header { background: linear-gradient(135deg, #0f172a 0%, #1c1c1e 100%); color: #ffffff; padding: 32px 24px; text-align: center; border-bottom: 3px solid #f2b90c; }
+          .header h1 { margin: 0; font-size: 24px; font-weight: 900; color: #f2b90c; letter-spacing: -0.5px; }
+          .header p { margin: 6px 0 0; color: #94a3b8; font-size: 13px; font-weight: 600; }
+          .body { padding: 28px 28px; }
+          .highlight-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 14px; padding: 18px; margin: 20px 0; }
+          .badge-row { margin-bottom: 8px; font-size: 13px; color: #334155; }
+          .label { font-weight: 700; color: #64748b; }
+          .val { font-weight: 800; color: #0f172a; }
+          .notice-box { background: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 8px; margin: 20px 0; font-size: 13px; color: #92400e; line-height: 1.5; }
+          .option-card { background: #ffffff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 16px; margin-bottom: 12px; text-align: left; }
+          .btn-primary { display: inline-block; background: #f2b90c; color: #0f172a !important; text-decoration: none; padding: 12px 22px; border-radius: 9999px; font-weight: 900; font-size: 13px; margin-top: 8px; text-align: center; }
+          .btn-community { display: inline-block; background: #25d366; color: #ffffff !important; text-decoration: none; padding: 12px 22px; border-radius: 9999px; font-weight: 900; font-size: 13px; margin-top: 8px; text-align: center; }
+          .footer { text-align: center; font-size: 12px; color: #94a3b8; padding: 20px 24px; background: #f8fafc; border-top: 1px solid #f1f5f9; }
         </style>
       </head>
       <body>
         <div class="container">
           <div class="header">
-            <h1>Welcome to Boardly!</h1>
-            <p style="margin: 4px 0 0; color: #cbd5e1; font-size: 13px;">Pakistan's Premier Exam Prep Platform</p>
+            <h1>Scholario / SHS Student Portal</h1>
+            <p>Registration Confirmation & Student Welcome</p>
           </div>
           <div class="body">
-            <h2 style="font-size: 18px; font-weight: 700; color: #0f172a; margin-top: 0;">Welcome aboard, ${name}!</h2>
+            <h2 style="font-size: 19px; font-weight: 800; color: #0f172a; margin-top: 0;">Welcome, ${name}!</h2>
             <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-              Thank you for signing up for Boardly (${email}). We are thrilled to accompany you on your exam preparation journey for MDCAT, TCAT, Federal Board, and Provincial Board exams.
+              Thank you for starting your registration with us (${email}). We are excited to support your path toward academic excellence!
             </p>
-            <p style="font-size: 14px; line-height: 1.6; color: #334155;">
-              You can start taking practice tests, generating custom MCQs, and studying with our AI Study Buddy immediately.
-            </p>
+
+            <div class="highlight-card">
+              ${selectedTrack ? `<div class="badge-row"><span class="label">Selected Track:</span> <span class="val">${selectedTrack}</span></div>` : ''}
+              ${dreamUniversity ? `<div class="badge-row"><span class="label">Dream Institution:</span> <span class="val">${dreamUniversity}</span></div>` : ''}
+            </div>
+
+            <div class="notice-box">
+              <strong>⏳ Verification Notice:</strong><br>
+              Account verification and payment processing may take a short time as our team reviews submitted details. However, you can jump into learning immediately!
+            </div>
+
+            <h3 style="font-size: 15px; font-weight: 800; color: #0f172a; margin-top: 24px; margin-bottom: 12px;">In the Meantime, Choose How to Proceed:</h3>
+
+            <div class="option-card">
+              <strong style="font-size: 14px; color: #0f172a;">1. Start Free Tier Practice Immediately</strong>
+              <p style="font-size: 12px; color: #64748b; margin: 4px 0 10px 0;">Access free practice MCQs, sample tests, and daily exam questions right away without waiting.</p>
+              <a href="https://ais-pre-sunimgeeaslxzathtqw22b-183477009687.asia-east1.run.app" class="btn-primary" target="_blank">Launch Free Practice Tests</a>
+            </div>
+
+            <div class="option-card">
+              <strong style="font-size: 14px; color: #0f172a;">2. Join Our Official Student Community</strong>
+              <p style="font-size: 12px; color: #64748b; margin: 4px 0 10px 0;">Connect with peers, get past paper updates, and receive instant support from mentors in our WhatsApp community.</p>
+              <a href="https://chat.whatsapp.com/DKA260XqH9f85G2f6n3Y6L" class="btn-community" target="_blank">Join WhatsApp Community</a>
+            </div>
           </div>
           <div class="footer">
-            © ${new Date().getFullYear()} Boardly. All rights reserved.
+            © ${new Date().getFullYear()} Scholario / SHS Platform. All rights reserved.
           </div>
         </div>
       </body>
@@ -3806,14 +3705,19 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
   // API Endpoint: Send Welcome Email
   app.post("/api/send-welcome-email", async (req: express.Request, res: express.Response) => {
     try {
-      const { name, email } = req.body || {};
+      const { name, email, selectedTrack, dreamUniversity } = req.body || {};
       if (!email) {
         return res.status(400).json({ success: false, error: "Student email is required." });
       }
-      const html = generateWelcomeEmail({ name: name || "Student", email });
+      const html = generateWelcomeEmail({
+        name: name || "Student",
+        email: email.trim(),
+        selectedTrack,
+        dreamUniversity,
+      });
       const sendRes = await sendEmail({
-        to: email,
-        subject: "Welcome to Boardly - Your Exam Prep Journey Begins!",
+        to: email.trim(),
+        subject: `Welcome to Scholario! Your Registration for ${selectedTrack || 'Exam Prep'} is Confirmed`,
         html,
       });
       return res.status(200).json({ success: sendRes.success, error: sendRes.error });
@@ -3823,118 +3727,76 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     }
   });
 
-  // API Endpoint: Submit Payment Proof
-  app.post("/api/payment-requests/submit", driveUploadMulter.single("file"), async (req: express.Request, res: express.Response) => {
+  // In-memory payment requests fallback store (when Supabase payment_requests table is not provisioned)
+  const inMemoryPaymentRequests: any[] = [];
+
+  // API Endpoint: Submit Payment Request (WhatsApp Verification Flow)
+  app.post("/api/payment-requests/submit", express.json(), async (req: express.Request, res: express.Response) => {
     try {
-      const file = (req as any).file;
-      const { student_id, student_name, student_email, payment_method, amount, transaction_reference } = req.body || {};
+      const {
+        student_id,
+        student_name,
+        studentEmail,
+        student_email,
+        studentName,
+        payment_method,
+        paymentMethod,
+        amount,
+        transaction_reference,
+        transactionRef,
+        course_tier,
+        tier
+      } = req.body || {};
 
-      if (!student_id || !student_email || !payment_method || !amount) {
-        return res.status(400).json({ success: false, error: "Missing required fields: student_id, student_email, payment_method, amount." });
+      const resolvedStudentId = student_id || `anon-${Date.now()}`;
+      const resolvedName = student_name || studentName || 'Student';
+      const resolvedEmail = (student_email || studentEmail || '').toLowerCase().trim();
+      const resolvedMethod = payment_method || paymentMethod || 'JazzCash';
+      const resolvedAmount = amount || '0';
+      const resolvedTrx = (transaction_reference || transactionRef || '').trim();
+      const resolvedTier = course_tier || tier || '';
+
+      if (!resolvedEmail || !resolvedMethod || !resolvedAmount) {
+        return res.status(400).json({ success: false, error: "Missing required fields: student_email, payment_method, amount." });
       }
 
-      if (!file) {
-        return res.status(400).json({ success: false, error: "Payment screenshot file is required." });
-      }
-
-      let driveFileId = `proof-${Date.now()}`;
-      let driveFileUrl = "";
-
-      // Attempt upload to Google Drive if service key is present
-      if (process.env.GOOGLE_SERVICE_ACCOUNT_KEY) {
-        try {
-          const accessToken = await getGoogleAccessToken(process.env);
-          const SHARED_FOLDER_ID = getEnvVar("GOOGLE_DRIVE_FOLDER_ID", "1Kb6pb7EKoS5mCWPI8tRPeG1rc3yqpMsv");
-          const metadata = {
-            name: `PaymentProof_${student_name || 'Student'}_${Date.now()}_${file.originalname || 'proof.png'}`,
-            parents: [SHARED_FOLDER_ID],
-          };
-
-          const boundary = "-------" + Math.random().toString(36).substring(2);
-          const delimiter = `\r\n--${boundary}\r\n`;
-          const closeDelimiter = `\r\n--${boundary}--`;
-
-          const fileBuffer = file.buffer;
-          const fileUint8 = new Uint8Array(fileBuffer);
-
-          const encoder = new TextEncoder();
-          const part1 = encoder.encode(
-            `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${file.mimetype || "image/png"}\r\n\r\n`
-          );
-          const part2 = encoder.encode(closeDelimiter);
-
-          const multipartBody = new Uint8Array(part1.length + fileUint8.length + part2.length);
-          multipartBody.set(part1, 0);
-          multipartBody.set(fileUint8, part1.length);
-          multipartBody.set(part2, part1.length + fileUint8.length);
-
-          const driveRes = await fetch(
-            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
-            {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": `multipart/related; boundary=${boundary}`,
-              },
-              body: multipartBody,
-            }
-          );
-
-          if (driveRes.ok) {
-            const uploaded = await driveRes.json();
-            driveFileId = uploaded.id;
-            driveFileUrl = uploaded.webViewLink || `https://drive.google.com/file/d/${uploaded.id}/view`;
-          } else {
-            const errText = await driveRes.text();
-            console.warn("[Drive API Upload Warning - switching to Data URL fallback]:", errText);
-          }
-        } catch (driveErr: any) {
-          console.warn("[Drive Upload Exception, switching to Data URL fallback]:", driveErr?.message || driveErr);
-        }
-      } else {
-        console.log("[Notice]: GOOGLE_SERVICE_ACCOUNT_KEY not present, using Data URL storage fallback for payment proof screenshot.");
-      }
-
-      // Fallback: If Drive upload did not return a URL, convert file buffer to a Base64 Data URL
-      if (!driveFileUrl && file.buffer) {
-        try {
-          const base64Str = file.buffer.toString("base64");
-          driveFileUrl = `data:${file.mimetype || "image/png"};base64,${base64Str}`;
-        } catch {
-          driveFileUrl = "https://drive.google.com";
-        }
-      }
+      const driveFileId = `wa-${Date.now()}`;
+      const driveFileUrl = "WhatsApp Submission (+923222314436)";
 
       const supabaseAdmin = getSupabaseAdminClient() || getAuthClient(req);
       const newRecord = {
-        student_id: String(student_id),
-        student_name: String(student_name || 'Student'),
-        student_email: String(student_email).toLowerCase().trim(),
-        payment_method: String(payment_method),
-        amount: Number(amount) || amount,
+        id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        student_id: String(resolvedStudentId),
+        student_name: String(resolvedName),
+        student_email: String(resolvedEmail),
+        payment_method: String(resolvedMethod),
+        amount: Number(resolvedAmount) || resolvedAmount,
         drive_file_id: driveFileId,
         drive_file_url: driveFileUrl,
-        transaction_reference: String(transaction_reference || '').trim(),
+        transaction_reference: String(resolvedTrx),
         status: 'pending',
+        admin_note: resolvedTier ? `Track / Course Tier: ${resolvedTier}` : undefined,
         created_at: new Date().toISOString(),
       };
 
       let insertedData = newRecord;
-      if (supabaseAdmin) {
-        const { data, error } = await supabaseAdmin
-          .from('payment_requests')
-          .insert(newRecord)
-          .select('*')
-          .single();
+      inMemoryPaymentRequests.unshift(newRecord);
 
-        if (error) {
-          console.error("[Supabase Insert Error payment_requests]:", error);
-          return res.status(500).json({
-            success: false,
-            error: `Database save failed: ${error.message}`
-          });
-        } else if (data) {
-          insertedData = data;
+      if (supabaseAdmin) {
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('payment_requests')
+            .insert(newRecord)
+            .select('*')
+            .single();
+
+          if (error) {
+            console.warn("[Supabase Insert Warning payment_requests - saved in memory fallback]:", error.message);
+          } else if (data) {
+            insertedData = data;
+          }
+        } catch (dbErr: any) {
+          console.warn("[Supabase Insert Exception payment_requests]:", dbErr?.message);
         }
 
         // Update student profile payment status to Pending Verification
@@ -3946,9 +3808,9 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
               requires_payment: true,
               updated_at: new Date().toISOString(),
             })
-            .or(`id.eq.${student_id},email.eq.${student_email}`);
+            .or(`id.eq.${resolvedStudentId},email.eq.${resolvedEmail}`);
         } catch (stErr) {
-          console.warn("[Error updating student payment_status on proof upload]:", stErr);
+          console.warn("[Error updating student payment_status]:", stErr);
         }
       }
 
@@ -3962,7 +3824,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
       const studentEmailRes = await sendEmail({
         to: newRecord.student_email,
-        subject: "Payment Proof Received - Boardly Premium Access",
+        subject: "Payment Verification Request Received - Boardly Premium Access",
         html: studentEmailHtml,
       });
 
@@ -3979,7 +3841,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
       const adminEmailRes = await sendEmail({
         to: "shsvirtualadmin@gmail.com",
-        subject: `[NEW PAYMENT PROOF] ${newRecord.student_name} (${newRecord.student_email})`,
+        subject: `[NEW PAYMENT PROOF - WHATSAPP] ${newRecord.student_name} (${newRecord.student_email})`,
         html: adminEmailHtml,
       });
 
@@ -3994,7 +3856,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       });
     } catch (err: any) {
       console.error("[api/payment-requests/submit error]:", err);
-      return res.status(500).json({ success: false, error: err?.message || "Internal server error submitting payment proof." });
+      return res.status(500).json({ success: false, error: err?.message || "Internal server error submitting payment request." });
     }
   });
 
@@ -4004,22 +3866,35 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       const studentId = req.params.student_id;
       const supabaseAdmin = getSupabaseAdminClient() || getAuthClient(req);
 
-      if (!supabaseAdmin) {
-        return res.status(200).json({ success: true, requests: [] });
+      let list: any[] = [];
+      if (supabaseAdmin) {
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('payment_requests')
+            .select('*')
+            .eq('student_id', studentId)
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            list = data;
+          }
+        } catch (e) {
+          console.warn("Error fetching student payment_requests from Supabase:", e);
+        }
       }
 
-      const { data, error } = await supabaseAdmin
-        .from('payment_requests')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching student payment requests:", error);
-        return res.status(200).json({ success: true, requests: [] });
+      // Merge in-memory payment requests matching student_id
+      const memoryMatching = inMemoryPaymentRequests.filter(
+        (r) => String(r.student_id) === String(studentId)
+      );
+      const existingIds = new Set(list.map((r) => r.id));
+      for (const mem of memoryMatching) {
+        if (!existingIds.has(mem.id)) {
+          list.push(mem);
+        }
       }
 
-      return res.status(200).json({ success: true, requests: data || [] });
+      return res.status(200).json({ success: true, requests: list });
     } catch (err: any) {
       console.error("Error in get student payment requests:", err);
       return res.status(500).json({ success: false, error: err?.message || "Server error" });
@@ -4031,21 +3906,30 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     try {
       const supabaseAdmin = getSupabaseAdminClient() || getAuthClient(req);
 
-      if (!supabaseAdmin) {
-        return res.status(200).json({ success: true, requests: [] });
+      let list: any[] = [];
+      if (supabaseAdmin) {
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('payment_requests')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (!error && Array.isArray(data)) {
+            list = data;
+          }
+        } catch (e) {
+          console.warn("Error fetching all payment_requests from Supabase:", e);
+        }
       }
 
-      const { data, error } = await supabaseAdmin
-        .from('payment_requests')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        console.error("Error fetching all payment requests:", error);
-        return res.status(200).json({ success: true, requests: [] });
+      const existingIds = new Set(list.map((r) => r.id));
+      for (const mem of inMemoryPaymentRequests) {
+        if (!existingIds.has(mem.id)) {
+          list.push(mem);
+        }
       }
 
-      return res.status(200).json({ success: true, requests: data || [] });
+      return res.status(200).json({ success: true, requests: list });
     } catch (err: any) {
       console.error("Error in admin fetch payment requests:", err);
       return res.status(500).json({ success: false, error: err?.message || "Server error" });
@@ -4063,53 +3947,76 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
       const supabaseAdmin = getSupabaseAdminClient() || getAuthClient(req);
 
-      if (!supabaseAdmin) {
-        return res.status(500).json({ success: false, error: "Database client unavailable." });
+      let requestRow: any = null;
+
+      if (supabaseAdmin) {
+        try {
+          const { data, error } = await supabaseAdmin
+            .from('payment_requests')
+            .select('*')
+            .eq('id', requestId)
+            .maybeSingle();
+
+          if (!error && data) {
+            requestRow = data;
+          }
+        } catch (e) {
+          console.warn("Could not fetch payment_request from DB:", e);
+        }
       }
 
-      // 1. Fetch current payment request
-      const { data: requestRow, error: fetchErr } = await supabaseAdmin
-        .from('payment_requests')
-        .select('*')
-        .eq('id', requestId)
-        .single();
+      if (!requestRow) {
+        requestRow = inMemoryPaymentRequests.find((r) => r.id === requestId);
+      }
 
-      if (fetchErr || !requestRow) {
+      if (!requestRow) {
         return res.status(404).json({ success: false, error: "Payment request record not found." });
       }
 
-      // 2. Update payment request status
-      const { error: updateErr } = await supabaseAdmin
-        .from('payment_requests')
-        .update({
-          status,
-          admin_note: adminNote || null,
-          reviewed_at: new Date().toISOString(),
-          reviewed_by: reviewerEmail || 'shsvirtualadmin@gmail.com',
-        })
-        .eq('id', requestId);
+      // Update in memory record
+      requestRow.status = status;
+      requestRow.admin_note = adminNote || null;
+      requestRow.reviewed_at = new Date().toISOString();
+      requestRow.reviewed_by = reviewerEmail || 'shsvirtualadmin@gmail.com';
 
-      if (updateErr) {
-        console.error("Error updating payment request:", updateErr);
-        return res.status(500).json({ success: false, error: updateErr.message });
+      if (supabaseAdmin) {
+        try {
+          await supabaseAdmin
+            .from('payment_requests')
+            .update({
+              status,
+              admin_note: adminNote || null,
+              reviewed_at: new Date().toISOString(),
+              reviewed_by: reviewerEmail || 'shsvirtualadmin@gmail.com',
+            })
+            .eq('id', requestId);
+        } catch (updErr) {
+          console.warn("Could not update payment_requests in DB:", updErr);
+        }
       }
 
-      // 3. If approved, upgrade student status in Supabase
+      // If approved, upgrade student status in Supabase
       if (status === 'approved') {
         const studentId = requestRow.student_id;
         const studentEmail = requestRow.student_email;
 
-        await supabaseAdmin
-          .from('students')
-          .update({
-            payment_status: 'Verified & Paid',
-            requires_payment: false,
-            package_name: 'Boardly Premium Access',
-            status: 'active',
-            access_expires: new Date(Date.now() + 365 * 24 * 3600 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            updated_at: new Date().toISOString(),
-          })
-          .or(`id.eq.${studentId},email.eq.${studentEmail}`);
+        if (supabaseAdmin) {
+          try {
+            await supabaseAdmin
+              .from('students')
+              .update({
+                payment_status: 'Verified & Paid',
+                requires_payment: false,
+                package_name: 'Boardly Premium Access',
+                status: 'active',
+                access_expires: new Date(Date.now() + 365 * 24 * 3600 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+                updated_at: new Date().toISOString(),
+              })
+              .or(`id.eq.${studentId},email.eq.${studentEmail}`);
+          } catch (stErr) {
+            console.warn("Could not update student status in DB:", stErr);
+          }
+        }
 
         // Send Approval Email
         const appEmail = generatePaymentApprovedEmail({
@@ -4127,17 +4034,19 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         const studentId = requestRow.student_id;
         const studentEmail = requestRow.student_email;
 
-        try {
-          await supabaseAdmin
-            .from('students')
-            .update({
-              payment_status: 'Rejected',
-              requires_payment: true,
-              updated_at: new Date().toISOString(),
-            })
-            .or(`id.eq.${studentId},email.eq.${studentEmail}`);
-        } catch (rejErr) {
-          console.warn("[Error updating student payment_status on rejection]:", rejErr);
+        if (supabaseAdmin) {
+          try {
+            await supabaseAdmin
+              .from('students')
+              .update({
+                payment_status: 'Rejected',
+                requires_payment: true,
+                updated_at: new Date().toISOString(),
+              })
+              .or(`id.eq.${studentId},email.eq.${studentEmail}`);
+          } catch (rejErr) {
+            console.warn("[Error updating student payment_status on rejection]:", rejErr);
+          }
         }
 
         // Send Rejection Email

@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js";
-import { getGoogleAccessToken } from "../../_utils/googleAuth.js";
 
 interface PagesContext {
   request: Request;
@@ -13,8 +12,6 @@ function getSupabaseAdminClient(env: Record<string, string | undefined>) {
   return createClient(url, serviceKey);
 }
 
-const SHARED_FOLDER_ID = "1Kb6pb7EKoS5mCWPI8tRPeG1rc3yqpMsv";
-
 const handleSubmitPaymentRequest = async (context: PagesContext) => {
   const { request, env } = context;
 
@@ -27,108 +24,47 @@ const handleSubmitPaymentRequest = async (context: PagesContext) => {
 
   try {
     const contentType = request.headers.get("content-type") || "";
-    if (!contentType.includes("multipart/form-data")) {
+    let student_id = "";
+    let student_name = "Student";
+    let student_email = "";
+    let payment_method = "";
+    let amount = "";
+    let transaction_reference = "";
+    let course_tier = "";
+
+    if (contentType.includes("application/json")) {
+      const body = await request.json() as any;
+      student_id = body.student_id || body.studentId || "";
+      student_name = body.student_name || body.studentName || "Student";
+      student_email = body.student_email || body.studentEmail || "";
+      payment_method = body.payment_method || body.paymentMethod || "";
+      amount = body.amount || "";
+      transaction_reference = body.transaction_reference || body.transactionRef || "";
+      course_tier = body.course_tier || body.tier || "";
+    } else if (contentType.includes("multipart/form-data") || contentType.includes("application/x-www-form-urlencoded")) {
+      const formData = await request.formData();
+      student_id = formData.get("student_id")?.toString() || formData.get("studentId")?.toString() || "";
+      student_name = formData.get("student_name")?.toString() || formData.get("studentName")?.toString() || "Student";
+      student_email = formData.get("student_email")?.toString() || formData.get("studentEmail")?.toString() || "";
+      payment_method = formData.get("payment_method")?.toString() || formData.get("paymentMethod")?.toString() || "";
+      amount = formData.get("amount")?.toString() || "";
+      transaction_reference = formData.get("transaction_reference")?.toString() || formData.get("transactionRef")?.toString() || "";
+      course_tier = formData.get("course_tier")?.toString() || formData.get("tier")?.toString() || "";
+    }
+
+    if (!student_email || !payment_method || !amount) {
       return new Response(
-        JSON.stringify({ success: false, error: "Invalid Content-Type: Must be multipart/form-data" }),
+        JSON.stringify({ success: false, error: "Missing required fields: student_email, payment_method, amount." }),
         { status: 400, headers: corsHeaders }
       );
     }
 
-    const formData = await request.formData();
-    const student_id = formData.get("student_id")?.toString() || "";
-    const student_name = formData.get("student_name")?.toString() || "Student";
-    const student_email = formData.get("student_email")?.toString() || "";
-    const payment_method = formData.get("payment_method")?.toString() || "";
-    const amount = formData.get("amount")?.toString() || "";
-    const transaction_reference = formData.get("transaction_reference")?.toString() || "";
-    const course_tier = formData.get("course_tier")?.toString() || formData.get("tier")?.toString() || "";
-    const file = formData.get("file");
-
-    if (!student_id || !student_email || !payment_method || !amount) {
-      return new Response(
-        JSON.stringify({ success: false, error: "Missing required fields: student_id, student_email, payment_method, amount." }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    if (!file || typeof file === "string") {
-      return new Response(
-        JSON.stringify({ success: false, error: "Payment confirmation screenshot is required." }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    let driveFileId = `local-${Date.now()}`;
-    let driveFileUrl = "";
-
-    // Upload to Google Drive if credentials available
-    try {
-      const accessToken = await getGoogleAccessToken(env);
-      const metadata = {
-        name: `PaymentProof_${student_name || "Student"}_${Date.now()}_${file.name || "proof.png"}`,
-        parents: [SHARED_FOLDER_ID],
-      };
-
-      const boundary = "-------" + Math.random().toString(36).substring(2);
-      const delimiter = `\r\n--${boundary}\r\n`;
-      const closeDelimiter = `\r\n--${boundary}--`;
-
-      const fileBuffer = await file.arrayBuffer();
-      const fileUint8 = new Uint8Array(fileBuffer);
-
-      const encoder = new TextEncoder();
-      const part1 = encoder.encode(
-        `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${file.type || "image/png"}\r\n\r\n`
-      );
-      const part2 = encoder.encode(closeDelimiter);
-
-      const multipartBody = new Uint8Array(part1.length + fileUint8.length + part2.length);
-      multipartBody.set(part1, 0);
-      multipartBody.set(fileUint8, part1.length);
-      multipartBody.set(part2, part1.length + fileUint8.length);
-
-      const driveRes = await fetch(
-        "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": `multipart/related; boundary=${boundary}`,
-          },
-          body: multipartBody,
-        }
-      );
-
-      if (driveRes.ok) {
-        const uploaded = await driveRes.json();
-        driveFileId = uploaded.id;
-        driveFileUrl = uploaded.webViewLink || `https://drive.google.com/file/d/${uploaded.id}/view`;
-      } else {
-        const errText = await driveRes.text();
-        console.warn("[Cloudflare Function Drive API Warning]:", errText);
-      }
-    } catch (driveErr) {
-      console.warn("[Cloudflare Function Drive Upload Failed, continuing with fallback]:", driveErr);
-    }
-
-    // Fallback URL if Drive upload didn't produce a link
-    if (!driveFileUrl) {
-      try {
-        const fileBuf = await file.arrayBuffer();
-        const base64Str = btoa(String.fromCharCode(...new Uint8Array(fileBuf)));
-        if (base64Str.length < 500000) {
-          driveFileUrl = `data:${file.type || "image/png"};base64,${base64Str}`;
-        } else {
-          driveFileUrl = "https://drive.google.com";
-        }
-      } catch {
-        driveFileUrl = "https://drive.google.com";
-      }
-    }
+    const driveFileId = `wa-${Date.now()}`;
+    const driveFileUrl = "WhatsApp Submission (+923222314436)";
 
     const supabaseAdmin = getSupabaseAdminClient(env);
     const newRecord: Record<string, any> = {
-      student_id: String(student_id),
+      student_id: String(student_id || `anon-${Date.now()}`),
       student_name: String(student_name || "Student"),
       student_email: String(student_email).toLowerCase().trim(),
       payment_method: String(payment_method),
