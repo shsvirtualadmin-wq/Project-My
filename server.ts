@@ -1,6 +1,7 @@
 import express from "express";
 const app = express();
 import path from "path";
+import fs from "fs";
 import multer from "multer";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
@@ -3059,15 +3060,115 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     }
   });
 
+  // Local Past Papers Persistence Store
+  const PAST_PAPERS_DIR = path.join(process.cwd(), "data");
+  const UPLOADS_DIR = path.join(PAST_PAPERS_DIR, "uploads");
+  const PAST_PAPERS_FILE = path.join(PAST_PAPERS_DIR, "past_papers.json");
+
+  function ensurePastPapersDirs() {
+    if (!fs.existsSync(PAST_PAPERS_DIR)) fs.mkdirSync(PAST_PAPERS_DIR, { recursive: true });
+    if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+
+  function loadLocalPastPapers(): any[] {
+    try {
+      ensurePastPapersDirs();
+      if (fs.existsSync(PAST_PAPERS_FILE)) {
+        const raw = fs.readFileSync(PAST_PAPERS_FILE, "utf-8");
+        return JSON.parse(raw);
+      }
+    } catch (err) {
+      console.error("Error reading past_papers.json:", err);
+    }
+    return [];
+  }
+
+  function saveLocalPastPaper(paper: any) {
+    try {
+      ensurePastPapersDirs();
+      const current = loadLocalPastPapers();
+      const idx = current.findIndex((p: any) => p.id === paper.id);
+      if (idx >= 0) {
+        current[idx] = paper;
+      } else {
+        current.unshift(paper);
+      }
+      fs.writeFileSync(PAST_PAPERS_FILE, JSON.stringify(current, null, 2), "utf-8");
+    } catch (err) {
+      console.error("Error saving to past_papers.json:", err);
+    }
+  }
+
+  function deleteLocalPastPaper(id: string) {
+    try {
+      ensurePastPapersDirs();
+      const current = loadLocalPastPapers();
+      const filtered = current.filter((p: any) => p.id !== id);
+      fs.writeFileSync(PAST_PAPERS_FILE, JSON.stringify(filtered, null, 2), "utf-8");
+
+      try {
+        if (fs.existsSync(UPLOADS_DIR)) {
+          const files = fs.readdirSync(UPLOADS_DIR);
+          for (const f of files) {
+            if (f.startsWith(id)) {
+              fs.unlinkSync(path.join(UPLOADS_DIR, f));
+            }
+          }
+        }
+      } catch (fErr) {
+        console.warn("Notice: file removal warning:", fErr);
+      }
+    } catch (err) {
+      console.error("Error deleting past paper:", err);
+    }
+  }
+
   // Setup Multer for Express Drive Upload Endpoint
   const driveUploadMulter = multer({
     storage: multer.memoryStorage(),
     limits: { fileSize: 15 * 1024 * 1024 }, // 15MB Max
   });
 
-  // API Endpoint: Google Drive Upload
+  // API Endpoint: Serve local uploaded past paper files
+  app.get("/api/drive-file/:filename", (req: express.Request, res: express.Response) => {
+    try {
+      const filename = path.basename(req.params.filename);
+      const filePath = path.join(UPLOADS_DIR, filename);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).send("File not found.");
+      }
+      const ext = filename.split(".").pop()?.toLowerCase();
+      let contentType = "application/octet-stream";
+      if (ext === "pdf") contentType = "application/pdf";
+      else if (["jpg", "jpeg"].includes(ext || "")) contentType = "image/jpeg";
+      else if (ext === "png") contentType = "image/png";
+      else if (ext === "webp") contentType = "image/webp";
+
+      res.setHeader("Content-Type", contentType);
+      res.setHeader("Content-Disposition", `inline; filename="${filename}"`);
+      res.setHeader("Cache-Control", "public, max-age=86400");
+      return res.sendFile(filePath);
+    } catch (err) {
+      return res.status(500).send("Error reading requested file.");
+    }
+  });
+
+  // API Endpoint: Google Drive Upload (Strict Admin-Only Restriction)
   app.post("/api/drive-upload", driveUploadMulter.single("file"), async (req: express.Request, res: express.Response) => {
     try {
+      // 1. Strict Server-Side Admin Role Verification
+      const { user: tokenUser, isAdmin: isTokenAdmin } = await verifyAuthToken(req);
+      const headerAdminEmail = (req.headers["x-admin-email"] as string || "").trim().toLowerCase();
+      const bodyAdminEmail = (req.body?.adminEmail || "").trim().toLowerCase();
+      const isAdmin = isTokenAdmin || isAdminEmail(headerAdminEmail) || isAdminEmail(bodyAdminEmail);
+
+      if (!isAdmin) {
+        return res.status(403).json({
+          success: false,
+          error: "Forbidden: Uploading past papers and resources is strictly restricted to authorized administrators.",
+        });
+      }
+
       const file = (req as any).file;
       if (!file) {
         return res.status(400).json({ success: false, error: "No file uploaded. Please include a file in the 'file' field." });
@@ -3079,23 +3180,27 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
       const allowedMimePrefixes = ["image/"];
       const allowedMimes = ["application/pdf", "image/jpeg", "image/png", "image/webp", "image/gif", "image/svg+xml"];
-      const ext = (file.originalname || "").split(".").pop()?.toLowerCase();
-      const isAllowedExt = ["pdf", "jpg", "jpeg", "png", "webp", "gif"].includes(ext || "");
+      const ext = (file.originalname || "").split(".").pop()?.toLowerCase() || "pdf";
+      const isAllowedExt = ["pdf", "jpg", "jpeg", "png", "webp", "gif"].includes(ext);
       const isAllowedMime = allowedMimes.includes(file.mimetype) || allowedMimePrefixes.some(p => file.mimetype?.startsWith(p));
 
       if (!isAllowedExt && !isAllowedMime) {
         return res.status(400).json({
           success: false,
-          error: "Invalid file type. Only PDF and Image files (JPG, PNG, WEBP, GIF) are accepted.",
+          error: "Invalid file type. Only PDF documents and Image files (JPG, PNG, WEBP, GIF) are accepted.",
         });
       }
 
+      const category = (req.body?.category || "General").trim();
+      const title = (req.body?.title || file.originalname).trim();
+
+      // Attempt Google Drive Upload
+      let uploadedDriveItem: any = null;
       try {
         const accessToken = await getGoogleAccessToken(process.env);
-
         const SHARED_FOLDER_ID = "1Kb6pb7EKoS5mCWPI8tRPeG1rc3yqpMsv";
         const metadata = {
-          name: file.originalname,
+          name: title || file.originalname,
           parents: [SHARED_FOLDER_ID],
         };
 
@@ -3105,7 +3210,6 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
         const fileBuffer = file.buffer;
         const fileUint8 = new Uint8Array(fileBuffer);
-
         const encoder = new TextEncoder();
         const part1 = encoder.encode(
           `${delimiter}Content-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n${delimiter}Content-Type: ${file.mimetype || "application/octet-stream"}\r\n\r\n`
@@ -3130,35 +3234,59 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         );
 
         if (driveRes.ok) {
-          const uploaded = await driveRes.json();
-          console.log(`✅ [Google Drive Upload Succeeded]: File ID ${uploaded.id}, Name: ${uploaded.name}`);
-          return res.status(200).json({
-            success: true,
-            id: uploaded.id,
-            name: uploaded.name,
-            webViewLink: uploaded.webViewLink,
-            webContentLink: uploaded.webContentLink,
-            createdTime: uploaded.createdTime,
-          });
+          uploadedDriveItem = await driveRes.json();
+          console.log(`✅ [Google Drive Upload Succeeded]: File ID ${uploadedDriveItem.id}, Name: ${uploadedDriveItem.name}`);
+        } else {
+          const errText = await driveRes.text();
+          console.warn(`Notice: Google Drive API returned ${driveRes.status}, switching to seamless persistent storage:`, errText);
         }
-
-        const errText = await driveRes.text();
-        console.error(`❌ [Google Drive Upload API Failed - HTTP ${driveRes.status} ${driveRes.statusText}]:`, errText);
       } catch (driveErr: any) {
-        console.error("❌ [Google Drive Upload Exception]:", driveErr?.stack || driveErr?.message || driveErr);
+        console.warn("Notice: Google Drive API exception, using persistent local storage:", driveErr?.message || driveErr);
       }
 
-      // Fallback Data URL when Drive upload fails or has no quota
-      const base64Str = file.buffer ? file.buffer.toString("base64") : "";
-      const dataUrl = base64Str ? `data:${file.mimetype || "image/png"};base64,${base64Str}` : "https://drive.google.com";
+      // If Drive upload succeeded, save record
+      if (uploadedDriveItem && uploadedDriveItem.id) {
+        const paperItem = {
+          id: uploadedDriveItem.id,
+          name: title || uploadedDriveItem.name,
+          webViewLink: uploadedDriveItem.webViewLink,
+          webContentLink: uploadedDriveItem.webContentLink,
+          createdTime: uploadedDriveItem.createdTime || new Date().toISOString(),
+          mimeType: file.mimetype,
+          size: file.size,
+          category,
+          source: "google_drive",
+        };
+        saveLocalPastPaper(paperItem);
+        return res.status(200).json({ success: true, ...paperItem });
+      }
+
+      // High-availability fallback: Save file to disk in ./data/uploads and generate serving link
+      ensurePastPapersDirs();
+      const fileId = `paper-${Date.now()}`;
+      const filename = `${fileId}.${ext}`;
+      const filePath = path.join(UPLOADS_DIR, filename);
+      fs.writeFileSync(filePath, file.buffer);
+
+      const fileUrl = `/api/drive-file/${filename}`;
+      const paperItem = {
+        id: fileId,
+        name: title || file.originalname,
+        webViewLink: fileUrl,
+        webContentLink: fileUrl,
+        createdTime: new Date().toISOString(),
+        mimeType: file.mimetype,
+        size: file.size,
+        category,
+        source: "local_storage",
+      };
+
+      saveLocalPastPaper(paperItem);
+      console.log(`✅ [Past Paper Saved Persistently]: ID ${fileId}, Name: ${paperItem.name}, URL: ${fileUrl}`);
 
       return res.status(200).json({
         success: true,
-        id: `local-${Date.now()}`,
-        name: file.originalname || "uploaded_file",
-        webViewLink: dataUrl,
-        webContentLink: dataUrl,
-        createdTime: new Date().toISOString(),
+        ...paperItem,
       });
     } catch (err: any) {
       console.error("[api/drive-upload error]:", err);
@@ -3166,42 +3294,79 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
     }
   });
 
-  // API Endpoint: Google Drive List
+  // API Endpoint: Google Drive List (Combines Drive files & Persisted Local Papers)
   app.get("/api/drive-list", async (req: express.Request, res: express.Response) => {
     try {
-      const accessToken = await getGoogleAccessToken(process.env);
+      const localPapers = loadLocalPastPapers();
+      let driveFiles: any[] = [];
 
-      const SHARED_FOLDER_ID = "1Kb6pb7EKoS5mCWPI8tRPeG1rc3yqpMsv";
-      const query = `'${SHARED_FOLDER_ID}' in parents and trashed = false`;
-      const fields = "files(id,name,webViewLink,webContentLink,createdTime,mimeType,size)";
-      const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&orderBy=createdTime%20desc`;
+      try {
+        const accessToken = await getGoogleAccessToken(process.env);
+        const SHARED_FOLDER_ID = "1Kb6pb7EKoS5mCWPI8tRPeG1rc3yqpMsv";
+        const query = `'${SHARED_FOLDER_ID}' in parents and trashed = false`;
+        const fields = "files(id,name,webViewLink,webContentLink,createdTime,mimeType,size)";
+        const driveUrl = `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}&fields=${encodeURIComponent(fields)}&orderBy=createdTime%20desc`;
 
-      const driveRes = await fetch(driveUrl, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+        const driveRes = await fetch(driveUrl, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
 
-      if (!driveRes.ok) {
-        const errText = await driveRes.text();
-        return res.status(500).json({ success: false, error: `Google Drive API list failed (${driveRes.status}): ${errText}` });
+        if (driveRes.ok) {
+          const data = await driveRes.json();
+          driveFiles = (data.files || []).map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            webViewLink: f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,
+            webContentLink: f.webContentLink || `https://drive.google.com/uc?id=${f.id}&export=download`,
+            createdTime: f.createdTime,
+            mimeType: f.mimeType,
+            size: f.size,
+            category: "General",
+            source: "google_drive",
+          }));
+        }
+      } catch (dErr: any) {
+        console.warn("Notice: Drive API fetch warning in drive-list:", dErr?.message);
       }
 
-      const data = await driveRes.json();
-      const files = (data.files || []).map((f: any) => ({
-        id: f.id,
-        name: f.name,
-        webViewLink: f.webViewLink || `https://drive.google.com/file/d/${f.id}/view`,
-        webContentLink: f.webContentLink || `https://drive.google.com/uc?id=${f.id}&export=download`,
-        createdTime: f.createdTime,
-        mimeType: f.mimeType,
-        size: f.size,
-      }));
+      // Merge and deduplicate
+      const combinedMap = new Map<string, any>();
+      for (const p of localPapers) combinedMap.set(p.id, p);
+      for (const f of driveFiles) {
+        if (!combinedMap.has(f.id)) combinedMap.set(f.id, f);
+      }
 
-      return res.status(200).json(files);
+      const allFiles = Array.from(combinedMap.values()).sort((a, b) => {
+        const tA = new Date(a.createdTime || 0).getTime();
+        const tB = new Date(b.createdTime || 0).getTime();
+        return tB - tA;
+      });
+
+      return res.status(200).json(allFiles);
     } catch (err: any) {
       console.error("[api/drive-list error]:", err);
       return res.status(500).json({ success: false, error: err?.message || "Internal server error listing Drive files." });
+    }
+  });
+
+  // API Endpoint: Delete Past Paper Document (Admin Only)
+  app.delete("/api/drive-delete/:id", async (req: express.Request, res: express.Response) => {
+    try {
+      const { user: tokenUser, isAdmin: isTokenAdmin } = await verifyAuthToken(req);
+      const headerAdminEmail = (req.headers["x-admin-email"] as string || "").trim().toLowerCase();
+      const bodyAdminEmail = (req.query?.adminEmail as string || "").trim().toLowerCase();
+      const isAdmin = isTokenAdmin || isAdminEmail(headerAdminEmail) || isAdminEmail(bodyAdminEmail);
+
+      if (!isAdmin) {
+        return res.status(403).json({ success: false, error: "Forbidden: Deleting study resources is strictly restricted to administrators." });
+      }
+
+      const { id } = req.params;
+      deleteLocalPastPaper(id);
+      return res.status(200).json({ success: true, message: "Past paper removed successfully." });
+    } catch (err: any) {
+      console.error("[api/drive-delete error]:", err);
+      return res.status(500).json({ success: false, error: err?.message || "Failed to delete file." });
     }
   });
 

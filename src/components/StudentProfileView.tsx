@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { StudentProfile, User, updateStudentPersonalInfo, supabase } from '../lib/supabase';
+import { renderTargetUniversityBadge } from './InstitutionBadge';
+import { TargetUniversityModal } from './TargetUniversityModal';
 import {
   User as UserIcon,
   Mail,
@@ -41,6 +43,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
   const [editPhone, setEditPhone] = useState<string>(profile.phone || '');
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [showUniModal, setShowUniModal] = useState<boolean>(false);
 
   const initialLetter = (profile.name || user.email || 'S').charAt(0).toUpperCase();
 
@@ -321,14 +324,27 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
           </div>
 
           {/* Target University */}
-          <div className="p-3.5 bg-slate-50 dark:bg-[#202020] border border-black/5 dark:border-white/5 rounded-2xl space-y-1 sm:col-span-3">
-            <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
-              <GraduationCap className="w-3.5 h-3.5 text-[#F2B90C]" />
-              <span>Target University</span>
+          <div className="p-3.5 bg-slate-50 dark:bg-[#202020] border border-black/5 dark:border-white/5 rounded-2xl space-y-1.5 sm:col-span-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+                <GraduationCap className="w-3.5 h-3.5 text-[#F2B90C]" />
+                <span>Target University</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUniModal(true)}
+                className="text-[10px] text-amber-600 dark:text-amber-400 font-extrabold hover:underline cursor-pointer"
+              >
+                Change
+              </button>
             </div>
-            <span className="font-extrabold text-sm text-[#0A0A0A] dark:text-white block">
-              {profile.dream_university || profile.target_university || 'Not specified'}
-            </span>
+            <div>
+              {renderTargetUniversityBadge(
+                profile.dream_university || profile.target_university,
+                'md',
+                () => setShowUniModal(true)
+              )}
+            </div>
           </div>
         </div>
 
@@ -417,6 +433,16 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
           <span>Log Out of Account</span>
         </button>
       </div>
+
+      <TargetUniversityModal
+        isOpen={showUniModal}
+        onClose={() => setShowUniModal(false)}
+        currentUser={user}
+        userProfile={profile}
+        onUniversityUpdated={() => {
+          onRefreshProfile();
+        }}
+      />
     </div>
   );
 };

@@ -22,6 +22,7 @@ import { User, StudentProfile, fetchStudentWeaknessProfile, StudentWeaknessProfi
 import { HistoryItem } from '../types';
 import { PastPapersSection } from './PastPapersSection';
 import { InstitutionBadge, renderTargetUniversityBadge } from './InstitutionBadge';
+import { TargetUniversityModal } from './TargetUniversityModal';
 import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 
 /**
@@ -51,6 +52,7 @@ interface StudentHomeDashboardProps {
   onOpenLmsPortal: () => void;
   onOpenHistory: () => void;
   onOpenCommunity?: () => void;
+  onUpdateProfile?: (updatedProfile: StudentProfile) => void;
   isAdmin?: boolean;
 }
 
@@ -88,11 +90,13 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
   onOpenLmsPortal,
   onOpenHistory,
   onOpenCommunity,
+  onUpdateProfile,
   isAdmin = false,
 }) => {
   const [weaknessProfile, setWeaknessProfile] = useState<StudentWeaknessProfileData | null>(null);
   const [isLoadingProfile, setIsLoadingProfile] = useState<boolean>(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'past_papers'>('overview');
+  const [showUniModal, setShowUniModal] = useState<boolean>(false);
 
   // Fetch logged-in student's weakness profile securely via API
   useEffect(() => {
@@ -454,7 +458,11 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           <span className="font-bold text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider">
             Target University:
           </span>
-          {renderTargetUniversityBadge(userProfile?.dream_university || userProfile?.target_university)}
+          {renderTargetUniversityBadge(
+            userProfile?.dream_university || userProfile?.target_university,
+            'sm',
+            () => setShowUniModal(true)
+          )}
         </div>
       </div>
 
@@ -488,7 +496,11 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
       </div>
 
       {activeTab === 'past_papers' ? (
-        <PastPapersSection />
+        <PastPapersSection
+          isAdmin={isAdmin}
+          userProfile={userProfile}
+          currentUser={currentUser}
+        />
       ) : (
         <>
           {/* Progress Summary Bento Grid (Academic Performance & Gamification) */}
@@ -816,6 +828,18 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
       )}
         </>
       )}
+
+      <TargetUniversityModal
+        isOpen={showUniModal}
+        onClose={() => setShowUniModal(false)}
+        currentUser={currentUser}
+        userProfile={userProfile}
+        onUniversityUpdated={(updated) => {
+          if (onUpdateProfile) {
+            onUpdateProfile(updated);
+          }
+        }}
+      />
     </section>
   );
 });

@@ -189,13 +189,69 @@ const buildUrl = (
   return queryString ? `?${queryString}` : window.location.pathname;
 };
 
+export function getStudentDefaultClassAndGroup(profile: StudentProfile | null): { classNum: BoardClass; group: string } {
+  if (!profile) return { classNum: 11, group: 'Pre-Medical' };
+  const g = (profile.grade || '').trim();
+  const s = (profile.stream || '').trim();
+  if (g.toUpperCase().includes('MDCAT') || s.toUpperCase().includes('MDCAT')) {
+    return { classNum: 'MDCAT', group: 'MDCAT' };
+  } else if (g.toUpperCase().includes('TCAT') || s.toUpperCase().includes('TCAT')) {
+    return { classNum: 'TCAT', group: s || 'Pre-Engineering' };
+  } else {
+    const numMatch = g.match(/\d+/);
+    const classNum = numMatch ? (parseInt(numMatch[0], 10) as BoardClass) : 11;
+    const group = s || 'Pre-Medical';
+    return { classNum, group };
+  }
+}
+
 export function App() {
   const initialUrlState = useRef(getInitialUrlState()).current;
 
   const [screen, setScreen] = useState<ScreenType>(initialUrlState.screen);
   const [adminTab, setAdminTab] = useState<'students' | 'payment_requests' | 'activity_logs' | 'tests' | 'progress' | 'study_buddy' | 'audit' | 'rls' | 'bulk_import'>('students');
-  const [selectedClass, setSelectedClass] = useState<BoardClass | undefined>(initialUrlState.selectedClass);
-  const [selectedGroup, setSelectedGroup] = useState<string | undefined>(initialUrlState.selectedGroup);
+
+  const [selectedClass, setSelectedClass] = useState<BoardClass | undefined>(() => {
+    if (initialUrlState.selectedClass) return initialUrlState.selectedClass;
+    try {
+      const cachedUserStr = localStorage.getItem('boardly_cached_user');
+      const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+      let p: StudentProfile | null = null;
+      if (cachedUser?.id) {
+        const cachedP = localStorage.getItem(`boardly_profile_${cachedUser.id}`);
+        if (cachedP) p = JSON.parse(cachedP);
+      }
+      if (!p) {
+        const cachedG = localStorage.getItem('boardly_cached_profile');
+        if (cachedG) p = JSON.parse(cachedG);
+      }
+      if (p) {
+        return getStudentDefaultClassAndGroup(p).classNum;
+      }
+    } catch {}
+    return undefined;
+  });
+
+  const [selectedGroup, setSelectedGroup] = useState<string | undefined>(() => {
+    if (initialUrlState.selectedGroup) return initialUrlState.selectedGroup;
+    try {
+      const cachedUserStr = localStorage.getItem('boardly_cached_user');
+      const cachedUser = cachedUserStr ? JSON.parse(cachedUserStr) : null;
+      let p: StudentProfile | null = null;
+      if (cachedUser?.id) {
+        const cachedP = localStorage.getItem(`boardly_profile_${cachedUser.id}`);
+        if (cachedP) p = JSON.parse(cachedP);
+      }
+      if (!p) {
+        const cachedG = localStorage.getItem('boardly_cached_profile');
+        if (cachedG) p = JSON.parse(cachedG);
+      }
+      if (p) {
+        return getStudentDefaultClassAndGroup(p).group;
+      }
+    } catch {}
+    return undefined;
+  });
   const [selectedSubject, setSelectedSubject] = useState<string>(initialUrlState.selectedSubject);
   const [customTopic, setCustomTopic] = useState<string | undefined>(undefined);
 
@@ -1731,6 +1787,7 @@ export function App() {
                       userProfile={userProfile}
                       history={history}
                       isAdmin={isAdmin}
+                      onUpdateProfile={(updated) => setUserProfile(updated)}
                       onSelectMdcat={() => handleSelectClass('MDCAT')}
                       onSelectTcat={() => handleSelectClass('TCAT')}
                       onStartPracticeTest={() => {
@@ -1831,31 +1888,58 @@ export function App() {
                   }} selectedGradeContext={selectedClass?.toString()} onBack={() => setScreen(authBackScreen || 'intro')} />
                 )}
                 {screen === 'dashboard' && (
-                  <ClassStreamDashboard
-                    classNum={selectedClass || 11}
-                    group={selectedGroup || 'Pre-Medical'}
-                    history={history}
-                    isAdmin={isAdmin}
-                    currentUser={currentUser}
-                    userProfile={userProfile}
-                    isGenerating={isGenerating}
-                    onOpenAuth={(intendedParams) => {
-                      if (intendedParams) {
-                        setPendingTestParams(intendedParams);
-                      }
-                      setNextScreenAfterAuth('dashboard');
-                      setAuthBackScreen('dashboard');
-                      setScreen('auth');
-                    }}
-                    onSelectStream={(c, g) => {
-                      setSelectedClass(c);
-                      setSelectedGroup(g);
-                    }}
-                    onStartTest={handleStartTest}
-                    onBackToClasses={() => {
-                      setScreen('plan_selection');
-                    }}
-                  />
+                  (() => {
+                    const defaultClassGroup = userProfile ? getStudentDefaultClassAndGroup(userProfile) : null;
+                    const effectiveClass = selectedClass || defaultClassGroup?.classNum || 11;
+                    const effectiveGroup = selectedGroup || defaultClassGroup?.group || 'Pre-Medical';
+                    const isDashboardLoading = authLoading || (Boolean(currentUser) && !userProfile && profileSyncing);
+
+                    if (isDashboardLoading) {
+                      return (
+                        <div className="w-full max-w-7xl mx-auto p-6 space-y-6 animate-pulse">
+                          <div className="bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-3xl p-8 space-y-4">
+                            <div className="h-4 w-32 bg-slate-200 dark:bg-white/10 rounded-full" />
+                            <div className="h-8 w-64 bg-slate-200 dark:bg-white/10 rounded-xl" />
+                            <div className="h-4 w-96 bg-slate-200 dark:bg-white/10 rounded-xl" />
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div className="h-48 bg-slate-100 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10" />
+                            <div className="h-48 bg-slate-100 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10" />
+                            <div className="h-48 bg-slate-100 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10" />
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <ClassStreamDashboard
+                        classNum={effectiveClass}
+                        group={effectiveGroup}
+                        history={history}
+                        isAdmin={isAdmin}
+                        currentUser={currentUser}
+                        userProfile={userProfile}
+                        onUpdateProfile={(updated) => setUserProfile(updated)}
+                        isGenerating={isGenerating}
+                        onOpenAuth={(intendedParams) => {
+                          if (intendedParams) {
+                            setPendingTestParams(intendedParams);
+                          }
+                          setNextScreenAfterAuth('dashboard');
+                          setAuthBackScreen('dashboard');
+                          setScreen('auth');
+                        }}
+                        onSelectStream={(c, g) => {
+                          setSelectedClass(c);
+                          setSelectedGroup(g);
+                        }}
+                        onStartTest={handleStartTest}
+                        onBackToClasses={() => {
+                          setScreen('plan_selection');
+                        }}
+                      />
+                    );
+                  })()
                 )}
                 {screen === 'subject' && (
                   <SubjectScreen 

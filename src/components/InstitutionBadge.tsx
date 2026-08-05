@@ -335,14 +335,26 @@ export const InstitutionBadge: React.FC<InstitutionBadgeProps> = ({
   );
 };
 
-export function renderTargetUniversityBadge(targetUniStr?: string, size: 'sm' | 'md' = 'sm') {
+export function renderTargetUniversityBadge(targetUniStr?: string, size: 'sm' | 'md' = 'sm', onClick?: () => void) {
   const uni = (targetUniStr || '').trim();
   if (!uni) {
     return (
-      <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-xs font-extrabold border border-slate-200 dark:border-white/10">
+      <button
+        type="button"
+        onClick={onClick}
+        className={`inline-flex items-center gap-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 px-3 py-1 rounded-full text-xs font-extrabold border border-amber-500/30 transition-all ${
+          onClick ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]' : ''
+        }`}
+        title="Click to select your Target University"
+      >
         <GraduationCap className="w-3.5 h-3.5 text-amber-500" />
         <span>Target University Not Specified</span>
-      </span>
+        {onClick && (
+          <span className="text-[10px] bg-amber-500 text-white font-black px-1.5 py-0.5 rounded-md ml-1">
+            Tap to Select
+          </span>
+        )}
+      </button>
     );
   }
 
@@ -362,13 +374,19 @@ export function renderTargetUniversityBadge(targetUniStr?: string, size: 'sm' | 
   else if (lower.includes('kmu') || lower.includes('khyber')) instId = 'kmu';
 
   if (instId && INSTITUTIONS[instId]) {
-    return <InstitutionBadge id={instId} size={size} showFullName />;
+    return <InstitutionBadge id={instId} size={size} showFullName onClick={onClick} />;
   }
 
   return (
-    <span className="inline-flex items-center gap-1.5 bg-slate-900 text-white dark:bg-white/10 dark:text-amber-300 px-3.5 py-1 rounded-full text-xs font-extrabold border border-amber-500/30 shadow-xs">
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1.5 bg-slate-900 text-white dark:bg-white/10 dark:text-amber-300 px-3.5 py-1 rounded-full text-xs font-extrabold border border-amber-500/30 shadow-xs ${
+        onClick ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]' : ''
+      }`}
+    >
       <GraduationCap className="w-3.5 h-3.5 text-amber-400" />
       <span>{uni}</span>
-    </span>
+    </button>
   );
 }

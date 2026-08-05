@@ -9,6 +9,7 @@ import { PREBUILT_QUESTIONS, getPrebuiltQuestionsForSubject } from '../data/preb
 import { getBookmarkedQuestions, removeBookmark, saveBookmark, BookmarkedQuestion } from '../lib/bookmarks';
 import { fetchSharedCustomTopics, saveSharedCustomTopic, normalizeTopicName, fetchStudentMcqUsage, StudentMcqUsageInfo, User, StudentProfile } from '../lib/supabase';
 import { renderTargetUniversityBadge } from './InstitutionBadge';
+import { TargetUniversityModal } from './TargetUniversityModal';
 import { getSubjectBadgeStyle } from '../utils/subjectBadge';
 import { mapSubject } from '../utils/subjectMapper';
 import {
@@ -62,6 +63,7 @@ interface ClassStreamDashboardProps {
     bypassCache?: boolean;
   }) => void;
   onBackToClasses: () => void;
+  onUpdateProfile?: (updatedProfile: StudentProfile) => void;
 }
 
 export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
@@ -76,6 +78,7 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
   onSelectStream,
   onStartTest,
   onBackToClasses,
+  onUpdateProfile,
 }) => {
   if (String(classNum) === 'TCAT') {
     return (
@@ -132,6 +135,7 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
   >('subjects');
 
   const [showStreamSelector, setShowStreamSelector] = useState(false);
+  const [showUniModal, setShowUniModal] = useState(false);
 
   // Filter history items relevant to this class and group
   const getItemPercentage = (item: HistoryItem | any): number => {
@@ -429,7 +433,11 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
               <span className="font-bold text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider">
                 Target University:
               </span>
-              {renderTargetUniversityBadge(userProfile?.dream_university || userProfile?.target_university)}
+              {renderTargetUniversityBadge(
+                userProfile?.dream_university || userProfile?.target_university,
+                'sm',
+                () => setShowUniModal(true)
+              )}
             </div>
           </div>
 
@@ -1124,6 +1132,18 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
           )}
         </div>
       )}
+
+      <TargetUniversityModal
+        isOpen={showUniModal}
+        onClose={() => setShowUniModal(false)}
+        currentUser={currentUser || null}
+        userProfile={userProfile || null}
+        onUniversityUpdated={(updated) => {
+          if (onUpdateProfile) {
+            onUpdateProfile(updated);
+          }
+        }}
+      />
     </section>
   );
 };

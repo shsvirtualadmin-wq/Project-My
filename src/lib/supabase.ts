@@ -981,6 +981,8 @@ export async function saveStudentRegistration(
     grade: data.grade,
     stream: data.stream,
     subjects: data.subjects || [],
+    dream_university: data.dream_university || '',
+    target_university: data.dream_university || '',
     sign_up_method: 'Google',
     status: requiresPayment ? 'pending admin approval' : 'active',
     is_registered: true,
@@ -996,6 +998,7 @@ export async function saveStudentRegistration(
   // Persist locally for instant offline/fallback access
   try {
     localStorage.setItem(`boardly_profile_${userId}`, JSON.stringify(profile));
+    localStorage.setItem('boardly_cached_profile', JSON.stringify(profile));
   } catch (err) {
     console.warn('Failed to save profile to localStorage:', err);
   }
@@ -1017,6 +1020,8 @@ export async function saveStudentRegistration(
             email: profile.email,
             grade: profile.grade,
             stream: profile.stream,
+            dream_university: profile.dream_university,
+            target_university: profile.target_university,
             is_registered: true,
             sign_up_method: 'Google',
           });
@@ -1027,6 +1032,50 @@ export async function saveStudentRegistration(
   }
 
   return profile;
+}
+
+export async function saveStudentTargetUniversity(
+  userId: string,
+  targetUniversity: string
+): Promise<StudentProfile | null> {
+  const uni = targetUniversity.trim();
+  if (!userId) return null;
+
+  let updatedProfile: StudentProfile | null = null;
+  try {
+    const existingStr = localStorage.getItem(`boardly_profile_${userId}`);
+    if (existingStr) {
+      const existing = JSON.parse(existingStr);
+      updatedProfile = {
+        ...existing,
+        dream_university: uni,
+        target_university: uni,
+        updated_at: new Date().toISOString(),
+      };
+      localStorage.setItem(`boardly_profile_${userId}`, JSON.stringify(updatedProfile));
+      localStorage.setItem('boardly_cached_profile', JSON.stringify(updatedProfile));
+    }
+
+    if (isSupabaseConfigured) {
+      const { error } = await supabase
+        .from('students')
+        .update({
+          dream_university: uni,
+          target_university: uni,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', userId);
+
+      if (error) {
+        console.warn('Error updating target_university in Supabase:', error.message);
+      }
+    }
+
+    return updatedProfile;
+  } catch (err) {
+    console.error('Error saving target university:', err);
+    return null;
+  }
 }
 
 export async function updateStudentPersonalInfo(

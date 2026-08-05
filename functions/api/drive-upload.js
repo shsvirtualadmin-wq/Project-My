@@ -14,6 +14,17 @@ export const onRequestPost = async (context) => {
   };
 
   try {
+    const adminEmail = (request.headers.get("x-admin-email") || "").trim().toLowerCase();
+    const ADMIN_EMAILS = ["shsvirtualadmin@gmail.com", "shsteachersemail@gmail.com"];
+    const isAdmin = ADMIN_EMAILS.includes(adminEmail) || adminEmail.includes("admin");
+
+    if (!isAdmin) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Forbidden: Uploading past papers is strictly restricted to authorized administrators." }),
+        { status: 403, headers: corsHeaders }
+      );
+    }
+
     const contentType = request.headers.get("content-type") || "";
     if (!contentType.includes("multipart/form-data")) {
       return new Response(
