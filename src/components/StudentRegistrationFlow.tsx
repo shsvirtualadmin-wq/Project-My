@@ -178,10 +178,6 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
   );
   const [email, setEmail] = useState<string>(user?.email || '');
   const [phone, setPhone] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [confirmPassword, setConfirmPassword] = useState<string>('');
-  const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
 
   // Step 1: Track Selection
   const [selectedTrack, setSelectedTrack] = useState<'FBISE' | 'MDCAT' | 'TCAT'>('FBISE');
@@ -211,11 +207,20 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
   const [error, setError] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState<boolean>(false);
 
-  // Sync user info if props update
+  // Sync user info if props update or session is restored
   useEffect(() => {
-    if (user?.email && !email) setEmail(user.email);
-    if ((user?.user_metadata?.full_name || user?.user_metadata?.name) && !fullName) {
-      setFullName(user.user_metadata.full_name || user.user_metadata.name);
+    if (user) {
+      if (user.email) setEmail(user.email);
+      const name = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '';
+      if (name) setFullName(name);
+    } else {
+      supabase.auth.getUser().then(({ data }) => {
+        if (data?.user) {
+          if (data.user.email) setEmail(data.user.email);
+          const name = data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email?.split('@')[0] || '';
+          if (name) setFullName(name);
+        }
+      });
     }
   }, [user]);
 
@@ -276,30 +281,25 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
   };
 
   // Step 1 -> Step 2 Validation & Proceed
-  const handleProceedFromStep1 = () => {
+  const handleProceedFromStep1 = async () => {
     setError(null);
-    if (!fullName.trim()) {
-      setError('Please enter your full name.');
+
+    let activeUser = user;
+    if (!activeUser) {
+      const { data } = await supabase.auth.getUser();
+      activeUser = data?.user || null;
+    }
+
+    const resolvedEmail = email || activeUser?.email || '';
+    const resolvedName = fullName || activeUser?.user_metadata?.full_name || activeUser?.user_metadata?.name || activeUser?.email?.split('@')[0] || 'Student';
+
+    if (!resolvedEmail) {
+      setError('No active session found. Please sign in with Google to continue.');
       return;
     }
-    if (!email.trim() || !email.includes('@')) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-    if (!user || password.trim()) {
-      if (!password) {
-        setError('Please create a password for your account.');
-        return;
-      }
-      if (password.length < 6) {
-        setError('Password must be at least 6 characters long.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setError('Passwords do not match. Please verify your password.');
-        return;
-      }
-    }
+
+    setEmail(resolvedEmail);
+    setFullName(resolvedName);
     setCurrentStep(2);
   };
 
@@ -404,36 +404,16 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
         : `UET Taxila TCAT (${tcatGroup})`;
 
     try {
-      // 1. Account Creation with Supabase Auth if user is not already logged in
-      let registeredUserId = user?.id;
-      if (!registeredUserId && email.trim() && password) {
-        try {
-          const redirectUrl = `${window.location.origin}${window.location.pathname}`;
-          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-            email: email.trim(),
-            password,
-            options: {
-              data: {
-                full_name: fullName.trim(),
-                name: fullName.trim(),
-                phone: phone.trim(),
-              },
-              emailRedirectTo: redirectUrl,
-            },
-          });
-
-          if (signUpErr) {
-            console.warn('Supabase auth.signUp warning during registration submission:', signUpErr);
-          }
-          if (signUpData?.user?.id) {
-            registeredUserId = signUpData.user.id;
-          }
-        } catch (authEx) {
-          console.warn('Supabase auth.signUp exception during registration submission:', authEx);
-        }
+      // 1. Get current authenticated user ID
+      let activeUser = user;
+      if (!activeUser) {
+        const { data: authData } = await supabase.auth.getUser();
+        activeUser = authData?.user || null;
       }
 
-      const userId = registeredUserId || `anon-${Date.now()}`;
+      const userId = activeUser?.id || `anon-${Date.now()}`;
+      const activeName = fullName || activeUser?.user_metadata?.full_name || activeUser?.user_metadata?.name || activeUser?.email?.split('@')[0] || 'Student';
+      const activeEmail = email || activeUser?.email || '';
 
       // 2. Submit Payment Request details to backend
       const res = await fetch('/api/payment-requests/submit', {
@@ -592,84 +572,32 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
             </p>
           </div>
 
-          {/* User Contact Card Input (if missing) */}
+          {/* User Account Info Card & Optional Phone */}
           <div className="space-y-3 bg-slate-50 dark:bg-zinc-900/60 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
-            <div className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-              <UserIcon className="w-3.5 h-3.5 text-amber-500" />
-              <span>Student Profile Details</span>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-black text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                <span>Account Verified via Google</span>
+              </div>
+              <span className="text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+                Logged In
+              </span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                  Full Name <span className="text-amber-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g. Muhammad Ali"
-                  className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white outline-none"
-                />
+
+            <div className="flex items-center gap-3 bg-white dark:bg-[#141414] p-3 rounded-xl border border-slate-200/80 dark:border-white/10 shadow-xs">
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#F2B90C] to-amber-600 text-white flex items-center justify-center shrink-0 font-black text-sm shadow-xs">
+                {(fullName || email || 'S').charAt(0).toUpperCase()}
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                  Email Address <span className="text-amber-500">*</span>
-                </label>
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="student@example.com"
-                  className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                  Password {!user && <span className="text-amber-500">*</span>}
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required={!user}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min. 6 characters"
-                    className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl pl-3.5 pr-9 py-2 text-xs text-slate-900 dark:text-white outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
-                  >
-                    {showPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-extrabold text-slate-900 dark:text-white truncate">
+                  {fullName || 'Student User'}
                 </div>
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
-                  Confirm Password {!user && <span className="text-amber-500">*</span>}
-                </label>
-                <div className="relative">
-                  <input
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    required={!user}
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="Re-enter password"
-                    className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl pl-3.5 pr-9 py-2 text-xs text-slate-900 dark:text-white outline-none"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute right-2.5 top-2 text-slate-400 hover:text-slate-200 cursor-pointer p-0.5"
-                  >
-                    {showConfirmPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                  {email || 'Verified Google Account'}
                 </div>
               </div>
             </div>
+
             <div>
               <label className="block text-[11px] font-bold text-slate-600 dark:text-slate-300 mb-1">
                 WhatsApp / Mobile Number (Optional)
@@ -678,7 +606,7 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
                 type="tel"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="+92 300 1234567"
+                placeholder="e.g. +92 300 1234567"
                 className="w-full bg-white dark:bg-[#141414] border border-slate-300 dark:border-white/15 focus:border-[#F2B90C] rounded-xl px-3.5 py-2 text-xs text-slate-900 dark:text-white outline-none"
               />
             </div>

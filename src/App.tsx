@@ -29,6 +29,7 @@ import { IntroScreen } from './components/IntroScreen';
 import { StudentHomeDashboard } from './components/StudentHomeDashboard';
 import { GradesFlowScreen } from './components/GradesFlowScreen';
 import { GuidedSetupWizard, SetupWizardData } from './components/GuidedSetupWizard';
+import { StudentRegistrationFlow } from './components/StudentRegistrationFlow';
 import { ClassGroupScreen } from './components/ClassGroupScreen';
 import { SubjectScreen } from './components/SubjectScreen';
 import { DurationScreen } from './components/DurationScreen';
@@ -47,7 +48,6 @@ import { ThemeProvider } from './context/ThemeContext';
 import { PaymentRequiredScreen } from './components/PaymentRequiredScreen';
 import { PaymentProofModal } from './components/PaymentProofModal';
 import { PlanSelectionScreen, PlanId, PLAN_OPTIONS } from './components/PlanSelectionScreen';
-import { ResetPasswordScreen } from './components/ResetPasswordScreen';
 import { supabase, apiFetch, safeJsonResponse, syncUserProfile, saveTestToSupabase, fetchUserTestHistoryFromSupabase, clearUserTestHistoryInSupabase, fetchStudentProfileFromSupabase, fetchStudentMcqUsage, clearProfileCache, checkUserExistsInDatabase, isStudentExistingBeforeRule, isAdminEmail, verifyEmailTokenHash, User, StudentProfile } from './lib/supabase';
 import { App as CapacitorApp } from '@capacitor/app';
 import { ShieldCheck, Sun, Moon, WifiOff, AlertTriangle, Lock, ShieldAlert, GraduationCap, Sparkles, ArrowRight } from 'lucide-react';
@@ -66,8 +66,7 @@ type ScreenType =
   | 'auth'
   | 'test'
   | 'results'
-  | 'admin'
-  | 'reset_password';
+  | 'admin';
 
 export function isTrackAllowedForUser(
   profile: StudentProfile | null,
@@ -117,15 +116,6 @@ const getInitialUrlState = (): {
     return { screen: 'intro', selectedSubject: 'Urdu' };
   }
 
-  // Check if URL points to reset password path or recovery parameters
-  if (
-    window.location.pathname.includes('/reset-password') ||
-    window.location.search.includes('type=recovery') ||
-    window.location.hash.includes('type=recovery')
-  ) {
-    return { screen: 'reset_password', selectedSubject: 'Urdu' };
-  }
-
   // Check if URL contains email confirmation tokens or auth callback parameters
   if (
     window.location.search.includes('token_hash=') ||
@@ -139,20 +129,13 @@ const getInitialUrlState = (): {
     window.location.search.includes('error=') ||
     window.location.hash.includes('error=')
   ) {
-    if (
-      window.location.pathname.includes('/reset-password') ||
-      window.location.search.includes('type=recovery') ||
-      window.location.hash.includes('type=recovery')
-    ) {
-      return { screen: 'reset_password', selectedSubject: 'Urdu' };
-    }
     return { screen: 'auth', selectedSubject: 'Urdu' };
   }
 
   const params = new URLSearchParams(window.location.search);
   const urlScreen = params.get('screen') as ScreenType | null;
   const validScreens: ScreenType[] = [
-    'intro', 'guided_wizard', 'plan_selection', 'grades_flow', 'group', 'dashboard', 'subject', 'duration', 'auth', 'test', 'results', 'admin', 'reset_password'
+    'intro', 'guided_wizard', 'plan_selection', 'grades_flow', 'group', 'dashboard', 'subject', 'duration', 'auth', 'test', 'results', 'admin'
   ];
 
   let initialScreen: ScreenType = 'intro';
@@ -186,9 +169,6 @@ const buildUrl = (
   grp?: string,
   sub?: string
 ) => {
-  if (scr === 'reset_password') {
-    return '/reset-password';
-  }
   const params = new URLSearchParams();
   if (scr !== 'intro') {
     params.set('screen', scr);
@@ -613,11 +593,11 @@ export function App() {
     }
   }, [currentUser, isAdmin, userProfile, isRegisteredStudent, selectedClass, selectedGroup, screen]);
 
-  // Clean OAuth URL parameters immediately from browser history on mount (except when resetting password)
+  // Clean OAuth URL parameters immediately from browser history on mount
   useEffect(() => {
-    const hasHashToken = window.location.hash.includes('access_token') || window.location.hash.includes('type=recovery');
+    const hasHashToken = window.location.hash.includes('access_token');
     const hasSearchCode = window.location.search.includes('code=');
-    if ((hasHashToken || hasSearchCode) && screen !== 'reset_password' && !window.location.pathname.includes('/reset-password')) {
+    if (hasHashToken || hasSearchCode) {
       window.history.replaceState(null, '', window.location.pathname);
     }
   }, [screen]);
@@ -807,13 +787,6 @@ export function App() {
       });
       console.log('====================================');
 
-      const isRecovery =
-        authType === 'recovery' ||
-        window.location.hash.includes('type=recovery') ||
-        window.location.search.includes('type=recovery') ||
-        window.location.pathname.includes('/reset-password') ||
-        screenRef.current === 'reset_password';
-
       if (tokenHash) {
         console.log('[Auth Callback] Verifying token_hash with Supabase verifyOtp...');
         verifyEmailTokenHash(tokenHash, authType || 'signup').then((res) => {
@@ -821,18 +794,10 @@ export function App() {
           if (res.success && res.session?.user) {
             console.log('[Auth Callback] Verification success! User session set:', res.session.user.email);
             setCurrentUser(res.session.user);
-            if (isRecovery) {
-              setScreen('reset_password');
-            } else {
-              window.history.replaceState(null, '', window.location.pathname);
-            }
+            window.history.replaceState(null, '', window.location.pathname);
           } else if (res.error) {
             console.error('[Auth Callback] token_hash verification error:', res.error);
-            if (isRecovery) {
-              setScreen('reset_password');
-            } else {
-              setScreen('auth');
-            }
+            setScreen('auth');
           }
         });
       } else if (codeParam) {
@@ -842,27 +807,15 @@ export function App() {
           if (!error && data?.session?.user) {
             console.log('[Auth Callback] Code exchange success! User session set:', data.session.user.email);
             setCurrentUser(data.session.user);
-            if (isRecovery) {
-              setScreen('reset_password');
-            } else {
-              window.history.replaceState(null, '', window.location.pathname);
-            }
+            window.history.replaceState(null, '', window.location.pathname);
           } else if (error) {
             console.error('[Auth Callback] Code exchange error:', error);
-            if (isRecovery) {
-              setScreen('reset_password');
-            } else {
-              setScreen('auth');
-            }
+            setScreen('auth');
           }
         });
       } else if (urlError || urlErrorDescription) {
         console.error('[Auth Callback] URL contains Auth Error:', urlErrorDescription || urlError);
-        if (isRecovery) {
-          setScreen('reset_password');
-        } else {
-          setScreen('auth');
-        }
+        setScreen('auth');
       }
     }
 
@@ -872,19 +825,6 @@ export function App() {
         id: user.id,
         provider: user.app_metadata?.provider || 'email',
       });
-
-      const isRecoveryFlow =
-        screenRef.current === 'reset_password' ||
-        window.location.pathname.includes('/reset-password') ||
-        window.location.hash.includes('type=recovery') ||
-        window.location.search.includes('type=recovery') ||
-        sourceEvent === 'PASSWORD_RECOVERY';
-
-      if (isRecoveryFlow) {
-        console.log('[Auth Flow] Password recovery flow active. Maintaining reset_password screen.');
-        setScreen('reset_password');
-        return;
-      }
 
       const isUserAdmin = Boolean(user.email && isAdminEmail(user.email));
 
@@ -911,11 +851,11 @@ export function App() {
       const validStream = Boolean(profile?.stream && profile.stream.trim());
       const isReg = isUserAdmin || Boolean(profile?.is_registered) || (validGrade && validStream);
 
-      const hasHashToken = window.location.hash.includes('access_token') || window.location.hash.includes('type=recovery');
+      const hasHashToken = window.location.hash.includes('access_token');
       const hasSearchCode = window.location.search.includes('code=');
       const isPendingOAuth = localStorage.getItem('shs_oauth_redirect') === 'true' || sessionStorage.getItem('shs_oauth_redirect') === 'true';
 
-      if ((hasHashToken || hasSearchCode || isPendingOAuth) && screen !== 'reset_password' && !window.location.pathname.includes('/reset-password')) {
+      if (hasHashToken || hasSearchCode || isPendingOAuth) {
         localStorage.removeItem('shs_oauth_redirect');
         sessionStorage.removeItem('shs_oauth_redirect');
         if (window.location.hash || window.location.search) {
@@ -1788,9 +1728,13 @@ export function App() {
                   )
                 )}
                 {screen === 'guided_wizard' && (
-                  <GuidedSetupWizard
-                    onComplete={handleWizardComplete}
-                    onBackToHome={() => setScreen('intro')}
+                  <StudentRegistrationFlow
+                    user={currentUser}
+                    onRegistrationComplete={async (profile) => {
+                      await refreshUserProfile();
+                      setScreen('dashboard');
+                    }}
+                    onSkipToPractice={() => setScreen('dashboard')}
                   />
                 )}
                 {screen === 'plan_selection' && (
@@ -1951,17 +1895,6 @@ export function App() {
                       </p>
                     </div>
                   )
-                )}
-                {screen === 'reset_password' && (
-                  <ResetPasswordScreen
-                    onNavigateToLogin={() => {
-                      if (window.location.hash || window.location.search || window.location.pathname.includes('/reset-password')) {
-                        window.history.replaceState(null, '', '/');
-                      }
-                      setShowLmsModal(true);
-                      setScreen('intro');
-                    }}
-                  />
                 )}
               </>
             )}
