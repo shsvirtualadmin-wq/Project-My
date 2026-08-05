@@ -356,17 +356,28 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
       });
 
       if (res.success) {
+        const returnedProfile = res.profile;
+        console.log(`[DEBUG: Plan Update FRONTEND USE] Admin UI received update response:`, {
+          studentId: selectedStudentForPlan.id,
+          subscribedPlans: returnedProfile?.subscribed_plans || selectedPlansForChange,
+          assignedClasses: returnedProfile?.assigned_classes || selectedAssignedClassesForChange,
+          paymentStatus: returnedProfile?.payment_status || (isFree ? 'Free Plan' : 'Verified & Paid'),
+          isPro: returnedProfile?.is_pro ?? !isFree,
+          packageName: returnedProfile?.package_name || pkgName,
+        });
+
         setStudents((prev) =>
           prev.map((s) =>
             s.id === selectedStudentForPlan.id
               ? {
                   ...s,
-                  subscribed_plans: selectedPlansForChange,
-                  assigned_classes: selectedAssignedClassesForChange,
-                  is_pro: !isFree,
-                  package_name: pkgName,
-                  payment_status: isFree ? 'Free Plan' : 'Verified & Paid',
-                  requires_payment: isFree,
+                  ...(returnedProfile || {}),
+                  subscribed_plans: returnedProfile?.subscribed_plans || selectedPlansForChange,
+                  assigned_classes: returnedProfile?.assigned_classes || selectedAssignedClassesForChange,
+                  is_pro: returnedProfile?.is_pro ?? !isFree,
+                  package_name: returnedProfile?.package_name || pkgName,
+                  payment_status: returnedProfile?.payment_status || (isFree ? 'Free Plan' : 'Verified & Paid'),
+                  requires_payment: returnedProfile?.requires_payment ?? isFree,
                   status: 'active',
                 }
               : s

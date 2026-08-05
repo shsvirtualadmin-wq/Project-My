@@ -357,6 +357,7 @@ export function App() {
   const isExistingStudentUnaffected = Boolean(
     userProfile?.requires_payment === false ||
     userProfile?.payment_status === 'Verified & Paid' ||
+    userProfile?.is_pro === true ||
     (userProfile?.created_at && isStudentExistingBeforeRule(userProfile.created_at))
   );
   const isPaymentApprovedOrExempt = isAdmin || isExistingStudentUnaffected;
@@ -477,14 +478,16 @@ export function App() {
     let nextPaymentStatus = userProfile?.payment_status || 'Unpaid';
     let nextRequiresPayment = true;
 
-    if (!hasPaidPlan) {
+    const isAlreadyPro = Boolean(userProfile?.is_pro || userProfile?.payment_status === 'Verified & Paid');
+
+    if (isAlreadyPro) {
+      nextPaymentStatus = 'Verified & Paid';
+      nextRequiresPayment = false;
+    } else if (!hasPaidPlan) {
       nextPaymentStatus = 'Free Plan';
       nextRequiresPayment = false;
     } else {
-      if (userProfile?.payment_status === 'Verified & Paid') {
-        nextPaymentStatus = 'Verified & Paid';
-        nextRequiresPayment = false;
-      } else if (userProfile?.payment_status === 'Pending Verification') {
+      if (userProfile?.payment_status === 'Pending Verification') {
         nextPaymentStatus = 'Pending Verification';
         nextRequiresPayment = true;
       } else {

@@ -313,6 +313,114 @@ export function clearProfileCache(userId?: string) {
   }
 }
 
+// Helper to standardize student profile normalization from raw database rows
+export function normalizeStudentProfileFromRow(data: any, fallbackUserId?: string): StudentProfile {
+  if (!data) {
+    return {
+      id: fallbackUserId || '',
+      name: '',
+      email: '',
+      phone: '',
+      grade: '',
+      stream: '',
+      subjects: [],
+      sign_up_method: 'Google',
+      status: 'active',
+      is_registered: false,
+      package_name: 'FBISE Annual Practice Pass',
+      subscribed_plans: ['free'],
+      assigned_classes: [],
+      is_pro: false,
+      enrollment_date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      payment_status: 'Free Plan',
+      requires_payment: false,
+      access_expires: new Date(Date.now() + 365 * 24 * 3600 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  }
+
+  const email = data.email || '';
+  const isAdmin = isAdminEmail(email);
+  const validGrade = Boolean(data.grade && data.grade.trim() && data.grade !== 'General Student');
+  const validStream = Boolean(data.stream && data.stream.trim());
+  const hasGradeStream = Boolean(validGrade && validStream);
+  const isReg = isAdmin || Boolean(data.is_registered) || hasGradeStream;
+  const isExistingBeforeRule = isStudentExistingBeforeRule(data.created_at);
+
+  let subscribedPlans: string[] = [];
+  if (Array.isArray(data.subscribed_plans)) {
+    subscribedPlans = data.subscribed_plans.map((p: any) => String(p));
+  } else if (typeof data.subscribed_plans === 'string' && data.subscribed_plans.trim()) {
+    try {
+      const parsed = JSON.parse(data.subscribed_plans);
+      subscribedPlans = Array.isArray(parsed) ? parsed.map((p: any) => String(p)) : [String(data.subscribed_plans)];
+    } catch {
+      subscribedPlans = [String(data.subscribed_plans)];
+    }
+  }
+
+  let assignedClasses: string[] = [];
+  if (Array.isArray(data.assigned_classes)) {
+    assignedClasses = data.assigned_classes.map((c: any) => String(c));
+  } else if (typeof data.assigned_classes === 'string' && data.assigned_classes.trim()) {
+    try {
+      const parsed = JSON.parse(data.assigned_classes);
+      assignedClasses = Array.isArray(parsed) ? parsed.map((c: any) => String(c)) : [String(data.assigned_classes)];
+    } catch {
+      assignedClasses = [String(data.assigned_classes)];
+    }
+  }
+
+  if (assignedClasses.length === 0 && (data.grade || data.stream)) {
+    const derived = `${data.grade || ''}${data.stream ? ' ' + data.stream : ''}`.trim();
+    if (derived) assignedClasses = [derived];
+  }
+
+  const rawPaymentStatus = data.payment_status || (isAdmin || isExistingBeforeRule ? 'Verified & Paid' : 'Pending Verification');
+  const pkgName = data.package_name || '';
+  const pkgNameLower = pkgName.toLowerCase();
+
+  const hasNonFreePlan = subscribedPlans.some((p: string) => {
+    const pl = String(p).toLowerCase();
+    return pl !== 'free' && ['pro', 'fsc', 'mdcat', 'tcat', 'matric', 'premium', 'boardly_pro'].includes(pl);
+  });
+
+  const isPro = isAdmin ||
+    data.is_pro === true ||
+    rawPaymentStatus === 'Verified & Paid' ||
+    hasNonFreePlan ||
+    (pkgName.length > 0 && !pkgNameLower.includes('free'));
+
+  const finalPaymentStatus = isPro ? 'Verified & Paid' : rawPaymentStatus;
+  const finalRequiresPayment = isPro ? false : (typeof data.requires_payment === 'boolean' ? data.requires_payment : (!isAdmin && !isExistingBeforeRule));
+
+  return {
+    id: data.id || fallbackUserId || '',
+    name: data.name || '',
+    email: email,
+    phone: data.phone || '',
+    grade: data.grade || '',
+    stream: data.stream || '',
+    subjects: Array.isArray(data.subjects) ? data.subjects : [],
+    dream_university: data.dream_university || data.target_university || '',
+    target_university: data.target_university || data.dream_university || '',
+    sign_up_method: data.sign_up_method || 'Google',
+    status: data.status || (finalRequiresPayment ? 'pending admin approval' : 'active'),
+    is_registered: isReg,
+    package_name: pkgName || (isPro ? 'Boardly Pro Pass' : 'FBISE Annual Practice Pass'),
+    subscribed_plans: subscribedPlans.length > 0 ? subscribedPlans : (isPro ? ['fsc'] : ['free']),
+    assigned_classes: assignedClasses,
+    is_pro: isPro,
+    enrollment_date: data.enrollment_date || new Date(data.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    payment_status: finalPaymentStatus,
+    requires_payment: finalRequiresPayment,
+    access_expires: data.access_expires || new Date(Date.now() + 365 * 24 * 3600 * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+    created_at: data.created_at || new Date().toISOString(),
+    updated_at: data.updated_at || new Date().toISOString(),
+  };
+}
+
 // Helper to sync or create student profile in Supabase Postgres 'students' table
 export async function syncUserProfile(
   user: SupabaseUser,
@@ -374,23 +482,7 @@ export async function syncUserProfile(
           await supabase.from('students').update(updates).eq('id', user.id);
         }
 
-        const mergedGrade = existing.grade || updates.grade || '';
-        const mergedStream = existing.stream || '';
-        const isReg = isAdmin || Boolean(existing.is_registered && mergedGrade && mergedGrade !== 'General Student' && mergedStream);
-        const isExistingBeforeRule = isStudentExistingBeforeRule(existing.created_at);
-        const requiresPay = typeof existing.requires_payment === 'boolean'
-          ? existing.requires_payment
-          : (!isAdmin && !isExistingBeforeRule && existing.payment_status !== 'Verified & Paid');
-
-        finalProfile = {
-          ...existing,
-          ...updates,
-          grade: mergedGrade,
-          stream: mergedStream,
-          is_registered: isReg,
-          requires_payment: requiresPay,
-          payment_status: existing.payment_status || (isAdmin || isExistingBeforeRule ? 'Verified & Paid' : 'Unpaid'),
-        };
+        finalProfile = normalizeStudentProfileFromRow({ ...existing, ...updates }, user.id);
       } else {
         // Insert new student record
         const requiresPay = !isAdmin;
@@ -411,17 +503,7 @@ export async function syncUserProfile(
           console.warn('Failed to insert student into Supabase:', insertErr.message);
           finalProfile = newDefaultProfile;
         } else {
-          const insertedGrade = inserted?.grade || '';
-          const insertedStream = inserted?.stream || '';
-          const isReg = isAdmin || Boolean(inserted?.is_registered && insertedGrade && insertedGrade !== 'General Student' && insertedStream);
-          finalProfile = inserted
-            ? {
-                ...inserted,
-                is_registered: isReg,
-                requires_payment: requiresPay,
-                payment_status: inserted.payment_status || (isAdmin ? 'Verified & Paid' : 'Unpaid'),
-              }
-            : newDefaultProfile;
+          finalProfile = normalizeStudentProfileFromRow(inserted || newDefaultProfile, user.id);
         }
       }
 
@@ -431,6 +513,15 @@ export async function syncUserProfile(
         localStorage.setItem(`boardly_profile_${userId}`, JSON.stringify(finalProfile));
         localStorage.setItem('boardly_cached_profile', JSON.stringify(finalProfile));
       } catch {}
+
+      console.log(`[DEBUG: Plan Update FRONTEND USE] syncUserProfile student ${userId}:`, {
+        id: finalProfile.id,
+        email: finalProfile.email,
+        payment_status: finalProfile.payment_status,
+        is_pro: finalProfile.is_pro,
+        subscribed_plans: finalProfile.subscribed_plans,
+        package_name: finalProfile.package_name,
+      });
 
       return finalProfile;
     } catch (err) {
@@ -763,26 +854,7 @@ export async function fetchAllStudentsFromSupabase(): Promise<StudentProfile[]> 
       return [];
     }
 
-    return (data || []).map((row: any) => ({
-      id: row.id,
-      name: row.name || 'Unknown Student',
-      email: row.email || 'No Email',
-      phone: row.phone || '',
-      grade: row.grade || 'Not specified',
-      stream: row.stream || '',
-      status: row.status || 'active',
-      is_registered: row.is_registered ?? Boolean(row.grade && row.stream),
-      subjects: row.subjects || [],
-      sign_up_method: row.sign_up_method || 'Email/Password',
-      created_at: row.created_at || new Date().toISOString(),
-      updated_at: row.updated_at,
-      payment_status: row.payment_status || 'Unpaid',
-      requires_payment: row.requires_payment ?? true,
-      package_name: row.package_name || '',
-      subscribed_plans: row.subscribed_plans || [],
-      dream_university: row.dream_university || row.target_university || '',
-      access_expires: row.access_expires || '',
-    }));
+    return (data || []).map((row: any) => normalizeStudentProfileFromRow(row, row.id));
   } catch (err) {
     console.error('Failed to fetch students from Supabase:', err);
     return [];
@@ -1196,70 +1268,17 @@ export async function fetchStudentProfileFromSupabase(
             return null;
           }
 
-          const isAdmin = isAdminEmail(data.email);
-          const validGrade = Boolean(data.grade && data.grade.trim() && data.grade !== 'General Student');
-          const validStream = Boolean(data.stream && data.stream.trim());
-          const hasGradeStream = Boolean(validGrade && validStream);
-          const isReg = isAdmin || Boolean(data.is_registered) || hasGradeStream;
-          const isExistingBeforeRule = isStudentExistingBeforeRule(data.created_at);
+          const profile = normalizeStudentProfileFromRow(data, userId);
 
-          const requiresPayment = typeof data.requires_payment === 'boolean'
-            ? data.requires_payment
-            : (!isAdmin && !isExistingBeforeRule && data.payment_status !== 'Verified & Paid');
-
-          const paymentStatus = data.payment_status || (isAdmin || isExistingBeforeRule ? 'Verified & Paid' : 'Pending Verification');
-
-          const subscribedPlans: string[] = Array.isArray(data.subscribed_plans)
-            ? data.subscribed_plans
-            : typeof data.subscribed_plans === 'string'
-            ? (() => { try { return JSON.parse(data.subscribed_plans); } catch { return [data.subscribed_plans]; } })()
-            : [];
-
-          let assignedClasses: string[] = [];
-          if (Array.isArray(data.assigned_classes)) {
-            assignedClasses = data.assigned_classes;
-          } else if (typeof data.assigned_classes === 'string') {
-            try {
-              assignedClasses = JSON.parse(data.assigned_classes);
-            } catch {
-              assignedClasses = [data.assigned_classes];
-            }
-          }
-
-          if (assignedClasses.length === 0 && (data.grade || data.stream)) {
-            const derived = `${data.grade || ''}${data.stream ? ' ' + data.stream : ''}`.trim();
-            if (derived) assignedClasses = [derived];
-          }
-
-          const isPro = isAdmin ||
-            data.is_pro === true ||
-            paymentStatus === 'Verified & Paid' ||
-            subscribedPlans.some((p: string) => ['pro', 'fsc', 'mdcat', 'tcat', 'matric', 'premium', 'boardly_pro'].includes(String(p).toLowerCase())) ||
-            (data.package_name && !data.package_name.toLowerCase().includes('free'));
-
-          const profile: StudentProfile = {
-            id: data.id,
-            name: data.name || '',
-            email: data.email || '',
-            phone: data.phone || '',
-            grade: data.grade || '',
-            stream: data.stream || '',
-            subjects: data.subjects || [],
-            dream_university: data.dream_university || data.target_university || '',
-            target_university: data.target_university || data.dream_university || '',
-            sign_up_method: data.sign_up_method || 'Google',
-            status: data.status || (requiresPayment ? 'pending admin approval' : 'active'),
-            is_registered: isReg,
-            package_name: data.package_name || 'FBISE Annual Practice Pass',
-            subscribed_plans: subscribedPlans,
-            assigned_classes: assignedClasses,
-            is_pro: isPro,
-            enrollment_date: data.enrollment_date || new Date(data.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            payment_status: paymentStatus,
-            requires_payment: requiresPayment,
-            access_expires: data.access_expires || new Date(Date.now() + 365*24*3600*1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-            created_at: data.created_at || new Date().toISOString(),
-          };
+          console.log(`[DEBUG: Profile Fetched from DB] Student ${userId}:`, {
+            id: profile.id,
+            email: profile.email,
+            subscribed_plans: profile.subscribed_plans,
+            payment_status: profile.payment_status,
+            is_pro: profile.is_pro,
+            package_name: profile.package_name,
+            requires_payment: profile.requires_payment,
+          });
 
           // Update memory & local caches
           profileMemoryCache.set(userId, { profile, timestamp: Date.now() });
@@ -2270,7 +2289,21 @@ export async function updateStudentPlanInSupabase(params: {
 
     if (resp.ok && result?.success) {
       clearProfileCache(params.studentId);
-      return { success: true, message: result.message, profile: result.profile };
+      const normalizedProfile = normalizeStudentProfileFromRow(result.profile, params.studentId);
+      console.log(`[DEBUG: Plan Update API RESPONSE]`, {
+        status: resp.status,
+        studentId: params.studentId,
+        studentEmail: params.studentEmail,
+        returnedProfile: {
+          id: normalizedProfile.id,
+          email: normalizedProfile.email,
+          subscribed_plans: normalizedProfile.subscribed_plans,
+          payment_status: normalizedProfile.payment_status,
+          is_pro: normalizedProfile.is_pro,
+          package_name: normalizedProfile.package_name,
+        }
+      });
+      return { success: true, message: result.message, profile: normalizedProfile };
     }
 
     if (result && (result.error || result.message)) {

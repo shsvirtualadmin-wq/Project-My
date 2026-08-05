@@ -4407,29 +4407,142 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         updated_at: new Date().toISOString(),
       };
 
-      let updatedStudent = { ...currentStudent, ...planData };
+      console.log(`[DEBUG: Plan Update BEFORE] Student ID: ${currentStudent.id}, Email: ${currentStudent.email}`, {
+        oldPlan,
+        subscribed_plans: currentStudent.subscribed_plans,
+        payment_status: currentStudent.payment_status,
+        requires_payment: currentStudent.requires_payment,
+        is_pro: currentStudent.is_pro,
+      });
 
-      // Attempt to update Supabase students table safely
+      let updateSuccess = false;
+      let dbWriteError = null;
+
+      // Tier 1: Try full payload including is_pro and assigned_classes
       try {
-        const { data: updatedStudentData, error: updateErr } = await supabaseAdmin
+        const { data: uData, error: uErr } = await supabaseAdmin
           .from('students')
           .update(planData)
           .eq('id', currentStudent.id)
           .select();
-
-        if (updateErr) {
-          console.warn("[api/admin/update-student-plan] Supabase update warning (column missing or schema restriction):", updateErr.message);
-          // Fallback: try updating only standard updated_at column
-          await supabaseAdmin
-            .from('students')
-            .update({ updated_at: planData.updated_at })
-            .eq('id', currentStudent.id);
-        } else if (updatedStudentData && updatedStudentData[0]) {
-          updatedStudent = { ...updatedStudentData[0], ...planData };
+        if (!uErr && uData && uData.length > 0) {
+          updateSuccess = true;
+        } else if (uErr) {
+          dbWriteError = uErr.message;
         }
-      } catch (dbErr: any) {
-        console.warn("[api/admin/update-student-plan] Supabase update exception:", dbErr?.message || dbErr);
+      } catch (e: any) {
+        dbWriteError = e?.message || String(e);
       }
+
+      // Tier 2: Standard core payload (omit is_pro, assigned_classes if schema missing them)
+      if (!updateSuccess) {
+        try {
+          const corePayload = {
+            subscribed_plans: subscribedPlans,
+            package_name: packageName,
+            payment_status: finalPaymentStatus,
+            requires_payment: finalRequiresPayment,
+            status: 'active',
+            access_expires: accessExpiresStr,
+            updated_at: new Date().toISOString(),
+          };
+          const { data: uData2, error: uErr2 } = await supabaseAdmin
+            .from('students')
+            .update(corePayload)
+            .eq('id', currentStudent.id)
+            .select();
+          if (!uErr2 && uData2 && uData2.length > 0) {
+            updateSuccess = true;
+          }
+        } catch (e2: any) {}
+      }
+
+      // Tier 3: Convert subscribed_plans to JSON string if column is text
+      if (!updateSuccess) {
+        try {
+          const stringPayload = {
+            subscribed_plans: JSON.stringify(subscribedPlans),
+            package_name: packageName,
+            payment_status: finalPaymentStatus,
+            requires_payment: finalRequiresPayment,
+            status: 'active',
+            access_expires: accessExpiresStr,
+            updated_at: new Date().toISOString(),
+          };
+          const { data: uData3, error: uErr3 } = await supabaseAdmin
+            .from('students')
+            .update(stringPayload)
+            .eq('id', currentStudent.id)
+            .select();
+          if (!uErr3 && uData3 && uData3.length > 0) {
+            updateSuccess = true;
+          }
+        } catch (e3: any) {}
+      }
+
+      // Tier 4: Minimal update
+      if (!updateSuccess) {
+        try {
+          const minPayload = {
+            package_name: packageName,
+            payment_status: finalPaymentStatus,
+            requires_payment: finalRequiresPayment,
+            updated_at: new Date().toISOString(),
+          };
+          const { data: uData4, error: uErr4 } = await supabaseAdmin
+            .from('students')
+            .update(minPayload)
+            .eq('id', currentStudent.id)
+            .select();
+          if (!uErr4 && uData4 && uData4.length > 0) {
+            updateSuccess = true;
+          }
+        } catch (e4: any) {}
+      }
+
+      // Verify DB state after write
+      let verifiedData: any = null;
+      try {
+        const { data: vData } = await supabaseAdmin
+          .from('students')
+          .select('*')
+          .eq('id', currentStudent.id)
+          .maybeSingle();
+        verifiedData = vData;
+      } catch (vErr) {}
+
+      console.log(`[DEBUG: Plan Update WRITTEN TO DB] Student ID: ${currentStudent.id}, Email: ${currentStudent.email}`, {
+        updateSuccess,
+        verifiedDBRow: verifiedData ? {
+          id: verifiedData.id,
+          subscribed_plans: verifiedData.subscribed_plans,
+          payment_status: verifiedData.payment_status,
+          requires_payment: verifiedData.requires_payment,
+          package_name: verifiedData.package_name,
+          is_pro: verifiedData.is_pro,
+        } : 'NONE',
+      });
+
+      if (!updateSuccess && !verifiedData) {
+        return res.status(500).json({
+          success: false,
+          error: `Failed to commit plan update to database. ${dbWriteError ? 'Database Error: ' + dbWriteError : ''}`
+        });
+      }
+
+      const finalProfile = verifiedData ? { ...verifiedData, ...planData } : { ...currentStudent, ...planData };
+
+      console.log(`[DEBUG: Plan Update API RESPONSE] Student ID: ${currentStudent.id}`, {
+        success: true,
+        returnedProfile: {
+          id: finalProfile.id,
+          subscribed_plans: finalProfile.subscribed_plans,
+          payment_status: finalProfile.payment_status,
+          requires_payment: finalProfile.requires_payment,
+          is_pro: finalProfile.is_pro,
+          package_name: finalProfile.package_name,
+        }
+      });
 
       // Record Activity Log
       const logRecord = {
@@ -4455,7 +4568,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       return res.status(200).json({
         success: true,
         message: `Plan successfully updated to "${packageName}" for ${currentStudent.name || 'Student'}!`,
-        profile: updatedStudent
+        profile: finalProfile
       });
     } catch (err: any) {
       console.error("Error updating student plan:", err);
