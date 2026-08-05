@@ -63,7 +63,7 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
       await downloadQuizPdf({
         subject: config.subject,
         gradeOrPath,
-        questions,
+        questions: effectiveQuestions,
         includeAnswers: false,
         studentName,
       });
@@ -76,9 +76,13 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
 
   const questionStartTimeRef = useRef<number>(Date.now());
 
-  const currentQ = questions[currentIndex];
-  const targetTotalQ = config.questionCount || questions.length;
-  const totalQ = Math.max(questions.length, targetTotalQ);
+  const effectiveQuestions = (config.questionCount && config.questionCount > 0 && questions.length > config.questionCount)
+    ? questions.slice(0, config.questionCount)
+    : questions;
+
+  const currentQ = effectiveQuestions[currentIndex];
+  const targetTotalQ = config.questionCount || effectiveQuestions.length;
+  const totalQ = Math.min(effectiveQuestions.length, targetTotalQ);
   const currentAnswer = userAnswers[currentIndex];
   const isAnswered = Boolean(currentAnswer && currentAnswer.selectedOption !== null);
 
@@ -177,7 +181,7 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
 
   const handleFinishTest = () => {
     const totalTimeTaken = Math.max(1, config.durationMinutes * 60 - timeLeftSeconds);
-    const answerList: UserAnswer[] = questions.map((_, idx) => {
+    const answerList: UserAnswer[] = effectiveQuestions.map((_, idx) => {
       return (
         userAnswers[idx] || {
           questionIndex: idx,
@@ -197,7 +201,7 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
 
   const isUrduOrIslamiat =
     ['urdu', 'islam', 'din'].some((term) => (config.subject || '').toLowerCase().includes(term)) ||
-    questions.some((q) => containsUrdu(q.q) || q.options.some((o) => containsUrdu(o)));
+    effectiveQuestions.some((q) => containsUrdu(q.q) || q.options.some((o) => containsUrdu(o)));
 
   const urduOptionBadges = ['الف', 'ب', 'ج', 'د'];
 
@@ -508,7 +512,7 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
 
             <div className="grid grid-cols-5 gap-2 max-h-60 overflow-y-auto p-1">
               {Array.from({ length: totalQ }, (_, idx) => {
-                const isAvailable = idx < questions.length;
+                const isAvailable = idx < effectiveQuestions.length;
                 const ans = userAnswers[idx];
                 const isCurrent = idx === currentIndex;
                 const isDone = ans && ans.selectedOption !== null;

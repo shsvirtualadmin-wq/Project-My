@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { StudyBuddyFormattedMessage } from './StudyBuddyFormattedMessage';
 import {
   History,
@@ -54,6 +54,182 @@ interface IntroScreenProps {
   onSelectMdcat?: () => void;
   onSelectTcat?: () => void;
 }
+
+// ---------------------------------------------------------------------------
+// Animation Helper Components
+// ---------------------------------------------------------------------------
+
+const ScrollFadeInCard: React.FC<{
+  children: React.ReactNode;
+  delayIndex?: number;
+  className?: string;
+}> = ({ children, delayIndex = 0, className = '' }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        transitionDelay: `${delayIndex * 80}ms`,
+        transitionDuration: '500ms',
+        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+      }}
+      className={`transition-all transform ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
+      } ${className}`}
+    >
+      {children}
+    </div>
+  );
+};
+
+const AnimatedStatCard: React.FC<{
+  targetValue: number;
+  formatFn: (val: number) => string;
+  label: string;
+}> = ({ targetValue, formatFn, label }) => {
+  const [currentVal, setCurrentVal] = useState(0);
+  const [hasAnimated, setHasAnimated] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasAnimated) {
+          setHasAnimated(true);
+          const duration = 1200;
+          const startTime = performance.now();
+
+          const animate = (now: number) => {
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = 1 - (1 - progress) * (1 - progress);
+            setCurrentVal(Math.floor(eased * targetValue));
+
+            if (progress < 1) {
+              requestAnimationFrame(animate);
+            } else {
+              setCurrentVal(targetValue);
+            }
+          };
+          requestAnimationFrame(animate);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [targetValue, hasAnimated]);
+
+  return (
+    <div
+      ref={ref}
+      className="bg-slate-50/80 dark:bg-white/[0.04] border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-3.5 text-center relative overflow-hidden group hover:border-[#F2B90C]/50 transition-colors"
+    >
+      <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-r border-slate-300 dark:border-white/10" />
+      <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-l border-slate-300 dark:border-white/10" />
+      <span className="font-['Space_Grotesk'] font-black text-xl sm:text-2xl text-[#F2B90C] block leading-tight">
+        {formatFn(currentVal)}
+      </span>
+      <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
+        {label}
+      </span>
+    </div>
+  );
+};
+
+const AnimatedTableRow: React.FC<{
+  children: React.ReactNode;
+  delayIndex: number;
+}> = ({ children, delayIndex }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const ref = useRef<HTMLTableRowElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+        }
+      },
+      { threshold: 0.15 }
+    );
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <tr
+      ref={ref}
+      style={{
+        transitionDelay: `${delayIndex * 100}ms`,
+        transitionDuration: '500ms',
+      }}
+      className={`hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-all transform ${
+        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
+      }`}
+    >
+      {children}
+    </tr>
+  );
+};
+
+const TypewriterChatPreview: React.FC<{ fullText: string }> = ({ fullText }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [hasStarted, setHasStarted] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasStarted) {
+          setHasStarted(true);
+          setIsTyping(true);
+          let currentLen = 0;
+          const interval = setInterval(() => {
+            currentLen += 2;
+            if (currentLen >= fullText.length) {
+              setDisplayedText(fullText);
+              setIsTyping(false);
+              clearInterval(interval);
+            } else {
+              setDisplayedText(fullText.slice(0, currentLen));
+            }
+          }, 20);
+        }
+      },
+      { threshold: 0.3 }
+    );
+
+    if (ref.current) observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, [fullText, hasStarted]);
+
+  return (
+    <div ref={ref} className="relative">
+      <StudyBuddyFormattedMessage content={displayedText} />
+      {isTyping && (
+        <span className="inline-block w-1.5 h-3.5 bg-amber-400 ml-1 animate-pulse align-middle" />
+      )}
+    </div>
+  );
+};
 
 const CarouselLogoItem: React.FC<{ inst: any }> = ({ inst }) => {
   const [imgFailed, setImgFailed] = useState(false);
@@ -427,49 +603,26 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
               {/* Ticket-Stub Style Stats Strip */}
               <div className="pt-5 border-t border-slate-200/80 dark:border-white/10">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
-                  <div className="bg-slate-50/80 dark:bg-white/[0.04] border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-3.5 text-center relative overflow-hidden group hover:border-[#F2B90C]/50 transition-colors">
-                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-r border-slate-300 dark:border-white/10" />
-                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-l border-slate-300 dark:border-white/10" />
-                    <span className="font-['Space_Grotesk'] font-black text-xl sm:text-2xl text-[#F2B90C] block leading-tight">
-                      12K+
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      Students Practicing
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50/80 dark:bg-white/[0.04] border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-3.5 text-center relative overflow-hidden group hover:border-[#F2B90C]/50 transition-colors">
-                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-r border-slate-300 dark:border-white/10" />
-                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-l border-slate-300 dark:border-white/10" />
-                    <span className="font-['Space_Grotesk'] font-black text-xl sm:text-2xl text-[#F2B90C] block leading-tight">
-                      40,000+
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      MCQs Explained
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50/80 dark:bg-white/[0.04] border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-3.5 text-center relative overflow-hidden group hover:border-[#F2B90C]/50 transition-colors">
-                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-r border-slate-300 dark:border-white/10" />
-                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-l border-slate-300 dark:border-white/10" />
-                    <span className="font-['Space_Grotesk'] font-black text-xl sm:text-2xl text-[#F2B90C] block leading-tight">
-                      3 Tracks
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      FBISE, MDCAT, TCAT
-                    </span>
-                  </div>
-
-                  <div className="bg-slate-50/80 dark:bg-white/[0.04] border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-3.5 text-center relative overflow-hidden group hover:border-[#F2B90C]/50 transition-colors">
-                    <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-r border-slate-300 dark:border-white/10" />
-                    <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-l border-slate-300 dark:border-white/10" />
-                    <span className="font-['Space_Grotesk'] font-black text-xl sm:text-2xl text-[#F2B90C] block leading-tight">
-                      24/7
-                    </span>
-                    <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
-                      Study Buddy Uptime
-                    </span>
-                  </div>
+                  <AnimatedStatCard
+                    targetValue={studentCount > 1000 ? studentCount : 12000}
+                    formatFn={(v) => (v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}K+` : `${v}`)}
+                    label="Students Practicing"
+                  />
+                  <AnimatedStatCard
+                    targetValue={40000}
+                    formatFn={(v) => `${v.toLocaleString()}+`}
+                    label="MCQs Explained"
+                  />
+                  <AnimatedStatCard
+                    targetValue={3}
+                    formatFn={(v) => `${v} Tracks`}
+                    label="FBISE, MDCAT, TCAT"
+                  />
+                  <AnimatedStatCard
+                    targetValue={24}
+                    formatFn={(v) => `${v}/7`}
+                    label="Study Buddy Uptime"
+                  />
                 </div>
               </div>
             </div>
@@ -551,35 +704,41 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 transition-all space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-sm flex items-center justify-center border border-[#F2B90C]/30">
-                1
+            <ScrollFadeInCard delayIndex={0}>
+              <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 hover:shadow-md transition-all space-y-3 h-full">
+                <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-sm flex items-center justify-center border border-[#F2B90C]/30">
+                  1
+                </div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Select Your Exam Track</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                  Choose FBISE (Classes 9-12), PMDC MDCAT Medical, or UET Taxila TCAT Engineering test series.
+                </p>
               </div>
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">Select Your Exam Track</h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                Choose FBISE (Classes 9-12), PMDC MDCAT Medical, or UET Taxila TCAT Engineering test series.
-              </p>
-            </div>
+            </ScrollFadeInCard>
 
-            <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 transition-all space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-sm flex items-center justify-center border border-[#F2B90C]/30">
-                2
+            <ScrollFadeInCard delayIndex={1}>
+              <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 hover:shadow-md transition-all space-y-3 h-full">
+                <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-sm flex items-center justify-center border border-[#F2B90C]/30">
+                  2
+                </div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Practice Chapter MCQs</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                  Attempt chapter-wise tests with real-time timers, negative marking options, and step-by-step AI derivations.
+                </p>
               </div>
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">Practice Chapter MCQs</h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                Attempt chapter-wise tests with real-time timers, negative marking options, and step-by-step AI derivations.
-              </p>
-            </div>
+            </ScrollFadeInCard>
 
-            <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 transition-all space-y-3">
-              <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-sm flex items-center justify-center border border-[#F2B90C]/30">
-                3
+            <ScrollFadeInCard delayIndex={2}>
+              <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 hover:shadow-md transition-all space-y-3 h-full">
+                <div className="w-10 h-10 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-sm flex items-center justify-center border border-[#F2B90C]/30">
+                  3
+                </div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">Analyze & Fix Weak Spots</h3>
+                <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                  Review your topic-wise accuracy breakdown, review flagged errors, and chat 24/7 with Study Buddy AI.
+                </p>
               </div>
-              <h3 className="font-bold text-base text-slate-900 dark:text-white">Analyze & Fix Weak Spots</h3>
-              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                Review your topic-wise accuracy breakdown, review flagged errors, and chat 24/7 with Study Buddy AI.
-              </p>
-            </div>
+            </ScrollFadeInCard>
           </div>
         </section>
 
@@ -599,102 +758,107 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {/* Track 1: FBISE */}
-            <div
-              onClick={onSelectGradesFlow || onContinue}
-              className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 hover:border-[#F2B90C] rounded-2xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between gap-6 relative overflow-hidden"
-            >
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="w-12 h-12 rounded-xl bg-emerald-500/10 p-1 flex items-center justify-center border border-emerald-500/30 overflow-hidden shrink-0 shadow-xs">
-                    <CardLogoImage src="/logos/fbise.svg" alt="Federal Board (FBISE) Official Logo" fallbackText="FBISE" bgClass="bg-emerald-600" textClass="text-white" />
+            <ScrollFadeInCard delayIndex={0} className="h-full">
+              <div
+                onClick={onSelectGradesFlow || onContinue}
+                className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 hover:border-[#F2B90C] rounded-2xl p-6 shadow-sm hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer group flex flex-col justify-between gap-6 relative overflow-hidden h-full"
+              >
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-500/10 p-1 flex items-center justify-center border border-emerald-500/30 overflow-hidden shrink-0 shadow-xs">
+                      <CardLogoImage src="/logos/fbise.svg" alt="Federal Board (FBISE) Official Logo" fallbackText="FBISE" bgClass="bg-emerald-600" textClass="text-white" />
+                    </div>
+                    <span className="bg-[#F2B90C]/15 text-amber-900 dark:text-[#F2B90C] text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      Class 9 – 12
+                    </span>
                   </div>
-                  <span className="bg-[#F2B90C]/15 text-amber-900 dark:text-[#F2B90C] text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    Class 9 – 12
-                  </span>
+
+                  <div className="space-y-2">
+                    <h3 className="font-['Space_Grotesk'] font-extrabold text-xl text-slate-900 dark:text-white group-hover:text-[#F2B90C] transition-colors break-words min-w-0">
+                      Federal Board (FBISE)
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                      Complete SSC & HSSC question banks covering Physics, Chemistry, Biology, Mathematics, Computer Science, and English mapped to SLO guidelines.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/5 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>SLO Mapped Board Questions</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Past Paper Solutions with Keys</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
+                      <span>Chapter-wise Tests</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="font-['Space_Grotesk'] font-extrabold text-xl text-slate-900 dark:text-white group-hover:text-[#F2B90C] transition-colors break-words min-w-0">
-                    Federal Board (FBISE)
-                  </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                    Complete SSC & HSSC question banks covering Physics, Chemistry, Biology, Mathematics, Computer Science, and English mapped to SLO guidelines.
-                  </p>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/5 text-xs text-slate-600 dark:text-slate-300 font-medium">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>SLO Mapped Board Questions</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Past Paper Solutions with Keys</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" />
-                    <span>Chapter-wise Tests</span>
-                  </div>
-                </div>
+                <button className="w-full bg-slate-900 text-white dark:bg-white/10 group-hover:bg-[#F2B90C] group-hover:text-[#0A0A0A] font-bold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                  <span>Select FBISE Class</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
-
-              <button className="w-full bg-slate-900 text-white dark:bg-white/10 group-hover:bg-[#F2B90C] group-hover:text-[#0A0A0A] font-bold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
-                <span>Select FBISE Class</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            </ScrollFadeInCard>
 
             {/* Track 2: MDCAT Medical */}
-            <div
-              onClick={onSelectMdcat || onSelectGradesFlow || onContinue}
-              className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 hover:border-rose-500 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between gap-6 relative overflow-hidden"
-            >
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="w-12 h-12 rounded-xl bg-rose-500/10 p-1 flex items-center justify-center border border-rose-500/30 overflow-hidden shrink-0 shadow-xs">
-                    <CardLogoImage src="/logos/pmdc.svg" alt="PMDC MDCAT Official Logo" fallbackText="PMDC" bgClass="bg-rose-700" textClass="text-white" />
+            <ScrollFadeInCard delayIndex={1} className="h-full">
+              <div
+                onClick={onSelectMdcat || onSelectGradesFlow || onContinue}
+                className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 hover:border-rose-500 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer group flex flex-col justify-between gap-6 relative overflow-hidden h-full"
+              >
+                <div className="space-y-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="w-12 h-12 rounded-xl bg-rose-500/10 p-1 flex items-center justify-center border border-rose-500/30 overflow-hidden shrink-0 shadow-xs">
+                      <CardLogoImage src="/logos/pmdc.svg" alt="PMDC MDCAT Official Logo" fallbackText="PMDC" bgClass="bg-rose-700" textClass="text-white" />
+                    </div>
+                    <span className="bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
+                      Post-FSc Entrance
+                    </span>
                   </div>
-                  <span className="bg-rose-500/15 text-rose-700 dark:text-rose-300 text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider">
-                    Post-FSc Entrance
-                  </span>
+
+                  <div className="space-y-2">
+                    <h3 className="font-['Space_Grotesk'] font-extrabold text-xl text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors break-words min-w-0">
+                      MDCAT Medical Portal
+                    </h3>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                      Dedicated PMDC / PMC Medical entrance test prep covering Biology, Organic/Inorganic Chemistry, Physics & English reasoning.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/5 text-xs text-slate-600 dark:text-slate-300 font-medium">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span>Bio, Chem, Physics & English</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span>200-Question Timed Mock Tests</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-rose-500 shrink-0" />
+                      <span>Memory Tricks & High-Yield Notes</span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <h3 className="font-['Space_Grotesk'] font-extrabold text-xl text-slate-900 dark:text-white group-hover:text-rose-600 dark:group-hover:text-rose-400 transition-colors break-words min-w-0">
-                    MDCAT Medical Portal
-                  </h3>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                    Dedicated PMDC / PMC Medical entrance test prep covering Biology, Organic/Inorganic Chemistry, Physics & English reasoning.
-                  </p>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/5 text-xs text-slate-600 dark:text-slate-300 font-medium">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-rose-500 shrink-0" />
-                    <span>Bio, Chem, Physics & English</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-rose-500 shrink-0" />
-                    <span>200-Question Timed Mock Tests</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-rose-500 shrink-0" />
-                    <span>Memory Tricks & High-Yield Notes</span>
-                  </div>
-                </div>
+                <button className="w-full bg-slate-900 text-white dark:bg-white/10 group-hover:bg-rose-600 group-hover:text-white font-bold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
+                  <span>Open MDCAT Portal</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
               </div>
-
-              <button className="w-full bg-slate-900 text-white dark:bg-white/10 group-hover:bg-rose-600 group-hover:text-white font-bold py-3 rounded-xl text-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer">
-                <span>Open MDCAT Portal</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
+            </ScrollFadeInCard>
 
             {/* Track 3: TCAT Engineering */}
-            <div
-              onClick={onSelectTcat || onSelectGradesFlow || onContinue}
-              className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 hover:border-cyan-500 rounded-2xl p-6 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between gap-6 relative overflow-hidden"
-            >
+            <ScrollFadeInCard delayIndex={2} className="h-full">
+              <div
+                onClick={onSelectTcat || onSelectGradesFlow || onContinue}
+                className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 hover:border-cyan-500 rounded-2xl p-6 shadow-sm hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 cursor-pointer group flex flex-col justify-between gap-6 relative overflow-hidden h-full"
+              >
               <div className="space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="w-12 h-12 rounded-xl bg-cyan-500/10 p-1 flex items-center justify-center border border-cyan-500/30 overflow-hidden shrink-0 shadow-xs">
@@ -735,6 +899,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>
+          </ScrollFadeInCard>
           </div>
         </section>
 
@@ -773,7 +938,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                 </thead>
                 <tbody className="divide-y divide-slate-200/80 dark:divide-white/5 text-slate-700 dark:text-slate-300">
                   {/* Row 1 */}
-                  <tr className="hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                  <AnimatedTableRow delayIndex={0}>
                     <td className="p-4 sm:p-5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <DollarSign className="w-4 h-4 text-[#F2B90C]" />
                       Session Fee
@@ -784,10 +949,10 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                     <td className="p-4 sm:p-5 text-slate-500 dark:text-slate-400">
                       50,000 to 120,000 PKR per session
                     </td>
-                  </tr>
+                  </AnimatedTableRow>
 
                   {/* Row 2 */}
-                  <tr className="hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                  <AnimatedTableRow delayIndex={1}>
                     <td className="p-4 sm:p-5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Target className="w-4 h-4 text-[#F2B90C]" />
                       Syllabus Alignment
@@ -798,10 +963,10 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                     <td className="p-4 sm:p-5 text-slate-500 dark:text-slate-400">
                       Outdated paper notes & recycled lists
                     </td>
-                  </tr>
+                  </AnimatedTableRow>
 
                   {/* Row 3 */}
-                  <tr className="hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                  <AnimatedTableRow delayIndex={2}>
                     <td className="p-4 sm:p-5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <Brain className="w-4 h-4 text-[#F2B90C]" />
                       Instant AI Tutor
@@ -812,10 +977,10 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                     <td className="p-4 sm:p-5 text-slate-500 dark:text-slate-400">
                       Wait for next day’s lecture or TA availability
                     </td>
-                  </tr>
+                  </AnimatedTableRow>
 
                   {/* Row 4 */}
-                  <tr className="hover:bg-slate-50 dark:hover:bg-white/[0.02]">
+                  <AnimatedTableRow delayIndex={3}>
                     <td className="p-4 sm:p-5 font-bold text-slate-900 dark:text-white flex items-center gap-2">
                       <BarChart3 className="w-4 h-4 text-[#F2B90C]" />
                       Mock Test Simulation
@@ -826,7 +991,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                     <td className="p-4 sm:p-5 text-slate-500 dark:text-slate-400">
                       Manual paper keys delivered days later
                     </td>
-                  </tr>
+                  </AnimatedTableRow>
                 </tbody>
               </table>
             </div>
@@ -839,7 +1004,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
         <section id="study-buddy" className="space-y-6">
           <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-3xl p-6 sm:p-8 shadow-sm grid grid-cols-1 lg:grid-cols-2 gap-8 items-center relative overflow-hidden">
             {/* Background Glow */}
-            <div className="absolute top-0 right-0 w-72 h-72 bg-[#F2B90C]/[0.06] rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute top-0 right-0 w-72 h-72 bg-[#F2B90C]/[0.06] rounded-full blur-3xl pointer-events-none animate-pulse" />
 
             {/* Left Column: Copy & Highlights */}
             <div className="space-y-5">
@@ -888,9 +1053,12 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-slate-900 dark:text-white">Study Buddy AI</h4>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                      Online & Ready
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+                      </span>
+                      <span>Online & Ready</span>
                     </span>
                   </div>
                 </div>
@@ -909,8 +1077,8 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
               {/* Chat Message 2: Study Buddy AI */}
               <div className="flex justify-start">
                 <div className="bg-[#111827] border border-amber-500/20 text-slate-100 rounded-2xl rounded-tl-xs p-3.5 text-xs max-w-[92%] shadow-sm leading-relaxed">
-                  <StudyBuddyFormattedMessage
-                    content={`**Great question! Let’s break this down via Einstein’s Photoelectric Equation:**
+                  <TypewriterChatPreview
+                    fullText={`**Great question! Let’s break this down via Einstein’s Photoelectric Equation:**
 
 $$K.E._{\\text{max}} = h\\nu - \\Phi$$
 
@@ -968,50 +1136,49 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
 
           {/* 3x3 Testimonial Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTestimonials.map((item) => (
-              <div
-                key={item.id}
-                className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 transition-all flex flex-col justify-between gap-4"
-              >
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-0.5 text-amber-500">
-                      {[...Array(item.rating)].map((_, i) => (
-                        <Star key={i} className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                      ))}
+            {filteredTestimonials.map((item, idx) => (
+              <ScrollFadeInCard key={item.id} delayIndex={idx % 3} className="h-full">
+                <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl p-5 shadow-sm hover:border-[#F2B90C]/50 hover:shadow-md transition-all flex flex-col justify-between gap-4 h-full">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-0.5 text-amber-500">
+                        {[...Array(item.rating)].map((_, i) => (
+                          <Star key={i} className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                        ))}
+                      </div>
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 uppercase tracking-wider">
+                        {item.track}
+                      </span>
                     </div>
-                    <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 uppercase tracking-wider">
-                      {item.track}
-                    </span>
+
+                    <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-normal italic">
+                      “{item.quote}”
+                    </p>
                   </div>
 
-                  <p className="text-xs text-slate-700 dark:text-slate-200 leading-relaxed font-normal italic">
-                    “{item.quote}”
-                  </p>
+                  <div className="pt-3 border-t border-slate-100 dark:border-white/5 space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className={`w-9 h-9 rounded-full ${item.avatarBg} border font-black text-xs flex items-center justify-center shrink-0`}
+                      >
+                        {item.avatarText}
+                      </div>
+                      <div className="overflow-hidden">
+                        <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {item.name}
+                        </h4>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
+                          {item.cityBoard}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="inline-block bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border border-emerald-500/20">
+                      ✓ {item.outcome}
+                    </div>
+                  </div>
                 </div>
-
-                <div className="pt-3 border-t border-slate-100 dark:border-white/5 space-y-2">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className={`w-9 h-9 rounded-full ${item.avatarBg} border font-black text-xs flex items-center justify-center shrink-0`}
-                    >
-                      {item.avatarText}
-                    </div>
-                    <div className="overflow-hidden">
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                        {item.name}
-                      </h4>
-                      <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">
-                        {item.cityBoard}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="inline-block bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-[10px] font-extrabold px-2.5 py-0.5 rounded-md border border-emerald-500/20">
-                    ✓ {item.outcome}
-                  </div>
-                </div>
-              </div>
+              </ScrollFadeInCard>
             ))}
           </div>
         </section>
@@ -1032,64 +1199,72 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
             {/* Left: Origin Story */}
-            <div className="space-y-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
-              <div className="p-5 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 space-y-3">
-                <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
-                  <Award className="w-4 h-4 text-[#F2B90C]" />
-                  <span>From Late-Night Study Groups to Pakistan's Top AI Platform</span>
+            <ScrollFadeInCard delayIndex={0}>
+              <div className="space-y-4 text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed font-normal">
+                <div className="p-5 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 space-y-3">
+                  <div className="flex items-center gap-2 text-slate-900 dark:text-white font-bold text-sm">
+                    <Award className="w-4 h-4 text-[#F2B90C]" />
+                    <span>From Late-Night Study Groups to Pakistan's Top AI Platform</span>
+                  </div>
+                  <p>
+                    Boardly started as a humble WhatsApp study group where students across Rawalpindi and Islamabad traded past paper solutions, textbook notes, and high-yield MCQs during late-night exam prep.
+                  </p>
+                  <p>
+                    Seeing how commercial academies charged up to 100,000 PKR for basic test series, our team of former FBISE board toppers and software engineers built Boardly — giving every student equal access to chapter-wise question banks and instant AI concept explanations.
+                  </p>
                 </div>
-                <p>
-                  Boardly started as a humble WhatsApp study group where students across Rawalpindi and Islamabad traded past paper solutions, textbook notes, and high-yield MCQs during late-night exam prep.
-                </p>
-                <p>
-                  Seeing how commercial academies charged up to 100,000 PKR for basic test series, our team of former FBISE board toppers and software engineers built Boardly — giving every student equal access to chapter-wise question banks and instant AI concept explanations.
-                </p>
               </div>
-            </div>
+            </ScrollFadeInCard>
 
             {/* Right: Core Values */}
             <div className="space-y-3">
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 flex items-start gap-3.5">
-                <div className="w-8 h-8 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-xs flex items-center justify-center shrink-0 border border-[#F2B90C]/30 mt-0.5">
-                  <CheckCircle2 className="w-4 h-4 text-[#F2B90C]" />
+              <ScrollFadeInCard delayIndex={1}>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 flex items-start gap-3.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-xs flex items-center justify-center shrink-0 border border-[#F2B90C]/30 mt-0.5">
+                    <CheckCircle2 className="w-4 h-4 text-[#F2B90C]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                      Syllabus-Accuracy over Generic Content
+                    </h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                      Every MCQ is mapped directly to Student Learning Outcomes (SLOs), textbook chapters, and exact exam guidelines for FBISE, PMDC MDCAT, and UET Taxila.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                    Syllabus-Accuracy over Generic Content
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                    Every MCQ is mapped directly to Student Learning Outcomes (SLOs), textbook chapters, and exact exam guidelines for FBISE, PMDC MDCAT, and UET Taxila.
-                  </p>
-                </div>
-              </div>
+              </ScrollFadeInCard>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 flex items-start gap-3.5">
-                <div className="w-8 h-8 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-xs flex items-center justify-center shrink-0 border border-[#F2B90C]/30 mt-0.5">
-                  <Zap className="w-4 h-4 text-[#F2B90C]" />
+              <ScrollFadeInCard delayIndex={2}>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 flex items-start gap-3.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-xs flex items-center justify-center shrink-0 border border-[#F2B90C]/30 mt-0.5">
+                    <Zap className="w-4 h-4 text-[#F2B90C]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                      Explanation-First over Answer-Keys
+                    </h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                      We don't just show correct options. Every question features step-by-step reasoning, formula derivations, and 24/7 AI Study Buddy chat guidance.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                    Explanation-First over Answer-Keys
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                    We don't just show correct options. Every question features step-by-step reasoning, formula derivations, and 24/7 AI Study Buddy chat guidance.
-                  </p>
-                </div>
-              </div>
+              </ScrollFadeInCard>
 
-              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 flex items-start gap-3.5">
-                <div className="w-8 h-8 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-xs flex items-center justify-center shrink-0 border border-[#F2B90C]/30 mt-0.5">
-                  <Heart className="w-4 h-4 text-[#F2B90C]" />
+              <ScrollFadeInCard delayIndex={3}>
+                <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 flex items-start gap-3.5">
+                  <div className="w-8 h-8 rounded-xl bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] font-black text-xs flex items-center justify-center shrink-0 border border-[#F2B90C]/30 mt-0.5">
+                    <Heart className="w-4 h-4 text-[#F2B90C]" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                      Priced for Students, Not Academies
+                    </h4>
+                    <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                      Top-grade test prep shouldn't cost 50,000 PKR. Boardly provides full features, mock tests, and past paper analytics completely free or on accessible student plans. All purchases are final — strict no-refunds policy.
+                    </p>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                    Priced for Students, Not Academies
-                  </h4>
-                  <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                    Top-grade test prep shouldn't cost 50,000 PKR. Boardly provides full features, mock tests, and past paper analytics completely free or on accessible student plans. All purchases are final — strict no-refunds policy.
-                  </p>
-                </div>
-              </div>
+              </ScrollFadeInCard>
             </div>
           </div>
         </section>
@@ -1234,7 +1409,8 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
             SECTION 11: FINAL CTA BAND
            ========================================================================= */}
         <section className="bg-gradient-to-r from-slate-900 via-[#1A1A1A] to-slate-900 dark:from-[#141414] dark:via-[#1c1c1c] dark:to-[#141414] border border-amber-500/30 dark:border-[#F2B90C]/30 rounded-3xl p-8 sm:p-12 text-center relative overflow-hidden shadow-xl space-y-6">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-[#F2B90C]/[0.08] rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-0 right-0 w-80 h-80 bg-[#F2B90C]/[0.1] rounded-full blur-3xl pointer-events-none animate-pulse" />
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-amber-400/[0.04] to-transparent pointer-events-none animate-shimmer" />
 
           <div className="space-y-3 relative z-10 max-w-xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-[#F2B90C]/20 border border-[#F2B90C]/40 text-[#F2B90C] px-3.5 py-1 rounded-full text-xs font-black uppercase tracking-wider">
@@ -1253,10 +1429,10 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
           <div className="relative z-10 flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={onSelectGradesFlow || onContinue}
-              className="w-full sm:w-auto bg-[#F2B90C] hover:bg-[#E0A800] text-[#0A0A0A] font-black py-4 px-8 rounded-full transition-all active:scale-95 shadow-lg flex items-center justify-center gap-2 text-sm sm:text-base cursor-pointer"
+              className="w-full sm:w-auto bg-[#F2B90C] hover:bg-[#E0A800] text-[#0A0A0A] font-black py-4 px-8 rounded-full transition-all duration-300 hover:scale-105 active:scale-95 shadow-lg hover:shadow-[#F2B90C]/30 flex items-center justify-center gap-2 text-sm sm:text-base cursor-pointer group"
             >
               <span>Join 12,000+ Students Free</span>
-              <ArrowRight className="w-4 h-4 stroke-[3]" />
+              <ArrowRight className="w-4 h-4 stroke-[3] group-hover:translate-x-1 transition-transform" />
             </button>
 
             <a
@@ -1264,7 +1440,7 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
               target="_blank"
               rel="noreferrer"
               onClick={() => onOpenCommunity && onOpenCommunity()}
-              className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-4 px-6 rounded-full transition-all active:scale-95 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
+              className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border border-white/20 font-bold py-4 px-6 rounded-full transition-all duration-300 hover:scale-105 active:scale-95 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
             >
               <MessageCircle className="w-4 h-4 text-emerald-400" />
               <span>Join WhatsApp Group</span>

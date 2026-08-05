@@ -1326,6 +1326,9 @@ export function App() {
 
           if (batchValidated.length > 0) {
             currentQuestions = [...currentQuestions, ...batchValidated];
+            if (currentQuestions.length > targetTotalCount) {
+              currentQuestions = currentQuestions.slice(0, targetTotalCount);
+            }
             setActiveQuestions([...currentQuestions]);
             console.log(`[MCQ Background Batch Appended] Total questions now: ${currentQuestions.length} / ${targetTotalCount}`);
           }
@@ -1344,6 +1347,9 @@ export function App() {
           }
           if (fallbackBatch.length > 0) {
             currentQuestions = [...currentQuestions, ...fallbackBatch];
+            if (currentQuestions.length > targetTotalCount) {
+              currentQuestions = currentQuestions.slice(0, targetTotalCount);
+            }
             setActiveQuestions([...currentQuestions]);
             console.log(`[MCQ Background Fallback Batch Appended] Total questions now: ${currentQuestions.length} / ${targetTotalCount}`);
           } else {
@@ -1367,6 +1373,9 @@ export function App() {
         }
         if (fallbackBatch.length > 0) {
           currentQuestions = [...currentQuestions, ...fallbackBatch];
+          if (currentQuestions.length > targetTotalCount) {
+            currentQuestions = currentQuestions.slice(0, targetTotalCount);
+          }
           setActiveQuestions([...currentQuestions]);
         } else {
           break;
@@ -1430,15 +1439,20 @@ export function App() {
     mcqAbortControllerRef.current = abortController;
     const currentReqId = ++mcqRequestIdRef.current;
 
-    const targetTotalCount = params.questionCount;
+    const targetTotalCount = Math.max(1, params.questionCount || 10);
     const initialBatchCount = Math.min(15, targetTotalCount);
 
     console.log(`[MCQ Progressive Instant Start] Target Subject: "${targetSubject}", Initial Batch: ${initialBatchCount}, Target Total: ${targetTotalCount}`);
 
-    // 1. Instantly assemble 15 initial questions (and full target pool fallback) from cache & prebuilt bank so the test screen opens immediately (< 0.5s)
+    // 1. Instantly assemble initial questions from cache & prebuilt bank so the test screen opens immediately (< 0.5s)
     let initialSet: Question[] = getCachedQuestions(targetSubject, targetTopic) || [];
     
-    // Top up to targetTotalCount using authentic prebuilt bank
+    // CRITICAL FIX: If cached set is larger than targetTotalCount, slice it to targetTotalCount!
+    if (initialSet.length > targetTotalCount) {
+      initialSet = initialSet.slice(0, targetTotalCount);
+    }
+
+    // Top up to targetTotalCount using authentic prebuilt bank if needed
     if (initialSet.length < targetTotalCount) {
       const prebuiltPool = getPrebuiltQuestionsForSubject(targetSubject);
       const shuffledPrebuilt = [...prebuiltPool].sort(() => 0.5 - Math.random());
@@ -1453,8 +1467,8 @@ export function App() {
       }
     }
 
-    // Ensure we have at least initialBatchCount questions ready
-    const readyQuestions = initialSet.slice(0, Math.max(initialBatchCount, initialSet.length));
+    // Ensure readyQuestions does NOT exceed targetTotalCount or initialBatchCount
+    const readyQuestions = initialSet.slice(0, Math.min(initialBatchCount, targetTotalCount, initialSet.length));
     setActiveQuestions(readyQuestions);
 
     // Immediately open test screen for the student! (0.1s UI latency)

@@ -106,9 +106,10 @@ export const DurationScreen: React.FC<DurationScreenProps> = ({
       {/* Preset Test Duration Cards */}
       <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl divide-y divide-slate-100 dark:divide-white/5 overflow-hidden shadow-sm transition-colors duration-200">
         {[
+          { mins: 5, count: 5, label: 'Quick Warmup', tag: '5 Mins' },
           { mins: 10, count: 10, label: 'Quick Practice', tag: '10 Mins' },
-          { mins: 20, count: 20, label: 'Standard Chapter Test', tag: '20 Mins' },
-          { mins: 30, count: 30, label: 'Full Board Exam Simulation', tag: '30 Mins' },
+          { mins: 15, count: 15, label: 'Standard Practice', tag: '15 Mins' },
+          { mins: 20, count: 20, label: 'Chapter Test', tag: '20 Mins' },
         ].map((item) => {
           const isSelected = selectedQuestions === item.count;
           return (
