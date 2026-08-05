@@ -4337,6 +4337,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         assignedClasses,
         packageName,
         paymentStatus = 'Verified & Paid',
+        isPro,
         expirationMonths = 12,
         adminNote,
         adminEmail
@@ -4389,16 +4390,15 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
       const accessExpiresStr = expDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
       // Determine payment gating flags
-      const isFree = subscribedPlans.includes('free') && subscribedPlans.length === 1;
-      const finalPaymentStatus = isFree ? 'Free Plan' : paymentStatus;
-      const finalRequiresPayment = isFree;
+      const isFree = subscribedPlans.includes('free') && subscribedPlans.length === 1 && !isPro;
+      const finalIsPro = typeof isPro === 'boolean' ? isPro : !isFree;
+      const finalPaymentStatus = finalIsPro ? 'Verified & Paid' : (isFree ? 'Free Plan' : (paymentStatus || 'Pending Verification'));
+      const finalRequiresPayment = !finalIsPro && isFree;
 
       const planData = {
         subscribed_plans: subscribedPlans,
-        assigned_classes: Array.isArray(assignedClasses) && assignedClasses.length > 0
-          ? assignedClasses
-          : (currentStudent.assigned_classes || [currentStudent.grade ? `${currentStudent.grade} ${currentStudent.stream || ''}`.trim() : 'General Student']),
-        is_pro: !isFree,
+        assigned_classes: Array.isArray(assignedClasses) ? assignedClasses : (currentStudent.assigned_classes || []),
+        is_pro: finalIsPro,
         package_name: packageName,
         payment_status: finalPaymentStatus,
         requires_payment: finalRequiresPayment,

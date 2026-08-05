@@ -137,6 +137,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
   const [selectedAssignedClassesForChange, setSelectedAssignedClassesForChange] = useState<string[]>([]);
   const [customPackageName, setCustomPackageName] = useState<string>('');
   const [expirationMonths, setExpirationMonths] = useState<number>(12);
+  const [isProForChange, setIsProForChange] = useState<boolean>(false);
   const [planAdminNote, setPlanAdminNote] = useState<string>('');
   const [isSavingPlan, setIsSavingPlan] = useState<boolean>(false);
   const [planToast, setPlanToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -261,44 +262,54 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
   const handleOpenPlanModal = (student: StudentProfile) => {
     setSelectedStudentForPlan(student);
     const existingPlans = student.subscribed_plans && student.subscribed_plans.length > 0 ? student.subscribed_plans : ['free'];
-    setSelectedPlansForChange(existingPlans);
+    // Default to single active plan selection
+    setSelectedPlansForChange([existingPlans[0] || 'free']);
+
     const existingClasses = student.assigned_classes && student.assigned_classes.length > 0
       ? student.assigned_classes
-      : [student.grade ? `${student.grade}${student.stream ? ' ' + student.stream : ''}`.trim() : 'FBISE 11 Pre-Engineering'];
+      : (student.grade ? [`${student.grade}${student.stream ? ' ' + student.stream : ''}`.trim()] : ['FBISE 11 Pre-Engineering']);
     setSelectedAssignedClassesForChange(existingClasses);
+
     setCustomPackageName(student.package_name || '');
-    setExpirationMonths(12);
+    setIsProForChange(Boolean(student.is_pro || student.payment_status === 'Verified & Paid'));
+
+    // Parse stored access_expires date to extract remaining/saved access period
+    let calculatedMonths = 12;
+    if (student.access_expires) {
+      try {
+        const expTime = new Date(student.access_expires).getTime();
+        if (!isNaN(expTime)) {
+          const nowTime = Date.now();
+          const diffDays = Math.round((expTime - nowTime) / (1000 * 60 * 60 * 24));
+          if (diffDays > 1000) calculatedMonths = 120; // Lifetime Access (10 Years)
+          else if (diffDays > 270) calculatedMonths = 12; // 1 Year
+          else if (diffDays > 120) calculatedMonths = 6;  // 6 Months
+          else if (diffDays > 45) calculatedMonths = 3;   // 3 Months
+          else if (diffDays > 0) calculatedMonths = 1;    // 1 Month
+        }
+      } catch (e) {}
+    }
+    setExpirationMonths(calculatedMonths);
     setPlanAdminNote('');
     setPlanToast(null);
   };
 
   const handleToggleAssignedClass = (clsName: string) => {
     if (selectedAssignedClassesForChange.includes(clsName)) {
-      if (selectedAssignedClassesForChange.length > 1) {
-        setSelectedAssignedClassesForChange(selectedAssignedClassesForChange.filter(c => c !== clsName));
-      }
+      setSelectedAssignedClassesForChange(selectedAssignedClassesForChange.filter(c => c !== clsName));
     } else {
       setSelectedAssignedClassesForChange([...selectedAssignedClassesForChange, clsName]);
     }
   };
 
   const handleTogglePlanOption = (planKey: string) => {
+    // Single plan selection rule: Only one plan should be selected at a time
+    setSelectedPlansForChange([planKey]);
     if (planKey === 'free') {
-      setSelectedPlansForChange(['free']);
-      return;
-    }
-
-    let next = selectedPlansForChange.filter(p => p !== 'free');
-    if (next.includes(planKey)) {
-      next = next.filter(p => p !== planKey);
+      setIsProForChange(false);
     } else {
-      next.push(planKey);
+      setIsProForChange(true);
     }
-
-    if (next.length === 0) {
-      next = ['free'];
-    }
-    setSelectedPlansForChange(next);
   };
 
   const handleSaveStudentPlan = async () => {
@@ -308,27 +319,17 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
 
     let pkgName = customPackageName.trim();
     if (!pkgName) {
-      const plans = selectedPlansForChange;
-      if (plans.includes('free') && plans.length === 1) {
-        pkgName = 'Free Plan';
-      } else if (plans.length === 1) {
-        const p = plans[0];
-        if (p === 'matric') pkgName = 'Matric Plan (Rs. 499/mo)';
-        else if (p === 'fsc') pkgName = 'FSc Plan (Rs. 999/mo)';
-        else if (p === 'tcat') pkgName = 'TCAT Engineering Plan (Rs. 1,499/mo)';
-        else if (p === 'mdcat') pkgName = 'MDCAT Medical Plan (Rs. 1,499/mo)';
-        else pkgName = `${p.toUpperCase()} Plan`;
-      } else {
-        const uppercasePlans = plans.map(p => {
-          if (p === 'matric') return 'Matric';
-          if (p === 'fsc') return 'FSc';
-          if (p === 'tcat') return 'TCAT';
-          if (p === 'mdcat') return 'MDCAT';
-          return p.toUpperCase();
-        });
-        pkgName = `${uppercasePlans.join(' + ')} Multi-Track Combo`;
-      }
+      const p = selectedPlansForChange[0] || 'free';
+      if (p === 'free') pkgName = 'Free Plan';
+      else if (p === 'matric') pkgName = 'Matric Plan (Rs. 499/mo)';
+      else if (p === 'fsc') pkgName = 'FSc Plan (Rs. 999/mo)';
+      else if (p === 'tcat') pkgName = 'TCAT Engineering Plan (Rs. 1,499/mo)';
+      else if (p === 'mdcat') pkgName = 'MDCAT Medical Plan (Rs. 1,499/mo)';
+      else pkgName = `${p.toUpperCase()} Plan`;
     }
+
+    const isFree = selectedPlansForChange.includes('free') && selectedPlansForChange.length === 1 && !isProForChange;
+    const paymentStatusVal = isProForChange ? 'Verified & Paid' : (isFree ? 'Free Plan' : 'Pending Verification');
 
     console.log('[Admin UI Click: Save & Update Subscription]', {
       studentId: selectedStudentForPlan.id,
@@ -336,20 +337,21 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
       subscribedPlans: selectedPlansForChange,
       assignedClasses: selectedAssignedClassesForChange,
       packageName: pkgName,
+      isPro: isProForChange,
       expirationMonths,
       adminNote: planAdminNote,
       adminEmail: detectedEmail,
     });
 
     try {
-      const isFree = selectedPlansForChange.includes('free') && selectedPlansForChange.length === 1;
       const res = await updateStudentPlanInSupabase({
         studentId: selectedStudentForPlan.id,
         studentEmail: selectedStudentForPlan.email,
         subscribedPlans: selectedPlansForChange,
         assignedClasses: selectedAssignedClassesForChange,
         packageName: pkgName,
-        paymentStatus: isFree ? 'Free Plan' : 'Verified & Paid',
+        paymentStatus: paymentStatusVal,
+        isPro: isProForChange,
         expirationMonths,
         adminNote: planAdminNote,
         adminEmail: detectedEmail,
@@ -357,14 +359,6 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
 
       if (res.success) {
         const returnedProfile = res.profile;
-        console.log(`[DEBUG: Plan Update FRONTEND USE] Admin UI received update response:`, {
-          studentId: selectedStudentForPlan.id,
-          subscribedPlans: returnedProfile?.subscribed_plans || selectedPlansForChange,
-          assignedClasses: returnedProfile?.assigned_classes || selectedAssignedClassesForChange,
-          paymentStatus: returnedProfile?.payment_status || (isFree ? 'Free Plan' : 'Verified & Paid'),
-          isPro: returnedProfile?.is_pro ?? !isFree,
-          packageName: returnedProfile?.package_name || pkgName,
-        });
 
         setStudents((prev) =>
           prev.map((s) =>
@@ -374,10 +368,10 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
                   ...(returnedProfile || {}),
                   subscribed_plans: returnedProfile?.subscribed_plans || selectedPlansForChange,
                   assigned_classes: returnedProfile?.assigned_classes || selectedAssignedClassesForChange,
-                  is_pro: returnedProfile?.is_pro ?? !isFree,
+                  is_pro: returnedProfile?.is_pro ?? isProForChange,
                   package_name: returnedProfile?.package_name || pkgName,
-                  payment_status: returnedProfile?.payment_status || (isFree ? 'Free Plan' : 'Verified & Paid'),
-                  requires_payment: returnedProfile?.requires_payment ?? isFree,
+                  payment_status: returnedProfile?.payment_status || paymentStatusVal,
+                  requires_payment: returnedProfile?.requires_payment ?? !isProForChange,
                   status: 'active',
                 }
               : s
@@ -386,7 +380,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
 
         setPlanToast({
           type: 'success',
-          message: res.message || `Plan successfully updated for ${selectedStudentForPlan.name}!`,
+          message: res.message || `Subscription & permissions successfully updated for ${selectedStudentForPlan.name}!`,
         });
 
         // Refresh activity logs
@@ -3221,10 +3215,10 @@ CREATE POLICY "Admin full access study_buddy_history" ON public.study_buddy_hist
               </p>
             </div>
 
-            {/* Select Subscription Preset / Multi-Track Options */}
+            {/* Select Subscription Preset / Track Options */}
             <div className="space-y-3">
               <label className="text-xs font-extrabold text-slate-900 dark:text-white block">
-                Select Track Access (Single or Multi-Track Combo):
+                Subscription Plan (Select One):
               </label>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
@@ -3338,6 +3332,32 @@ CREATE POLICY "Admin full access study_buddy_history" ON public.study_buddy_hist
                   )}
                 </button>
               </div>
+            </div>
+
+            {/* Pro Features Permission Toggle */}
+            <div className="p-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/5 dark:bg-amber-500/10 flex items-center justify-between gap-3">
+              <div className="space-y-0.5">
+                <div className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-amber-500 shrink-0" />
+                  <span>Enable Pro Features & AI Study Tools</span>
+                </div>
+                <div className="text-[11px] text-slate-600 dark:text-slate-300">
+                  Unlocks AI Study Buddy, Unlimited Practice MCQs & Full Test Series.
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsProForChange(!isProForChange)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer shrink-0 ${
+                  isProForChange ? 'bg-amber-500' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    isProForChange ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
             </div>
 
             {/* Assigned Class & Test Series Synchronization */}

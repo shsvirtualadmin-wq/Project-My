@@ -386,11 +386,14 @@ export function normalizeStudentProfileFromRow(data: any, fallbackUserId?: strin
     return pl !== 'free' && ['pro', 'fsc', 'mdcat', 'tcat', 'matric', 'premium', 'boardly_pro'].includes(pl);
   });
 
+  const isExplicitlyPro = typeof data.is_pro === 'boolean' ? data.is_pro : null;
+
   const isPro = isAdmin ||
-    data.is_pro === true ||
-    rawPaymentStatus === 'Verified & Paid' ||
-    hasNonFreePlan ||
-    (pkgName.length > 0 && !pkgNameLower.includes('free'));
+    (isExplicitlyPro !== null ? isExplicitlyPro : (
+      rawPaymentStatus === 'Verified & Paid' ||
+      hasNonFreePlan ||
+      (pkgName.length > 0 && !pkgNameLower.includes('free'))
+    ));
 
   const finalPaymentStatus = isPro ? 'Verified & Paid' : rawPaymentStatus;
   const finalRequiresPayment = isPro ? false : (typeof data.requires_payment === 'boolean' ? data.requires_payment : (!isAdmin && !isExistingBeforeRule));
@@ -2249,6 +2252,7 @@ export async function updateStudentPlanInSupabase(params: {
   assignedClasses?: string[];
   packageName: string;
   paymentStatus?: string;
+  isPro?: boolean;
   expirationMonths?: number;
   adminNote?: string;
   adminEmail: string;
@@ -2318,17 +2322,19 @@ export async function updateStudentPlanInSupabase(params: {
 
   // Direct Supabase database fallback to ensure updates complete reliably
   try {
-    const isFree = params.subscribedPlans.includes('free') && params.subscribedPlans.length === 1;
-    const finalPaymentStatus = isFree ? 'Free Plan' : (params.paymentStatus || 'Verified & Paid');
+    const isFree = params.subscribedPlans.includes('free') && params.subscribedPlans.length === 1 && !params.isPro;
+    const finalPaymentStatus = params.isPro ? 'Verified & Paid' : (isFree ? 'Free Plan' : (params.paymentStatus || 'Verified & Paid'));
     const finalRequiresPayment = isFree;
 
     const expDate = new Date();
     expDate.setMonth(expDate.getMonth() + Number(params.expirationMonths || 12));
     const accessExpiresStr = expDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-    const updatePayload = {
+    const updatePayload: any = {
       subscribed_plans: params.subscribedPlans,
+      assigned_classes: params.assignedClasses || [],
       package_name: params.packageName,
+      is_pro: typeof params.isPro === 'boolean' ? params.isPro : !isFree,
       payment_status: finalPaymentStatus,
       requires_payment: finalRequiresPayment,
       status: 'active',
