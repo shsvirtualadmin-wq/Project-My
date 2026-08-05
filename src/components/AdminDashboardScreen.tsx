@@ -362,7 +362,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
 
         setStudents((prev) =>
           prev.map((s) =>
-            s.id === selectedStudentForPlan.id
+            (s.id === selectedStudentForPlan.id || (Boolean(s.email) && Boolean(selectedStudentForPlan.email) && s.email.toLowerCase() === selectedStudentForPlan.email.toLowerCase()))
               ? {
                   ...s,
                   ...(returnedProfile || {}),

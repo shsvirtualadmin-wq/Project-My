@@ -65,7 +65,7 @@ function getAuthClient(req: express.Request | null) {
   });
 }
 
-const ADMIN_EMAILS = ["shsvirtualadmin@gmail.com", "shsteachersemail@gmail.com"];
+const ADMIN_EMAILS = ["shsvirtualadmin@gmail.com", "shsteachersemail@gmail.com", "itxakira67@gmail.com"];
 function isAdminEmail(email?: string | null): boolean {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
@@ -4434,11 +4434,13 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         dbWriteError = e?.message || String(e);
       }
 
-      // Tier 2: Standard core payload (omit is_pro, assigned_classes if schema missing them)
+      // Tier 2: Try stringified arrays for subscribed_plans & assigned_classes with is_pro
       if (!updateSuccess) {
         try {
-          const corePayload = {
-            subscribed_plans: subscribedPlans,
+          const stringifiedPayload = {
+            subscribed_plans: JSON.stringify(subscribedPlans),
+            assigned_classes: JSON.stringify(Array.isArray(assignedClasses) ? assignedClasses : (currentStudent.assigned_classes || [])),
+            is_pro: finalIsPro,
             package_name: packageName,
             payment_status: finalPaymentStatus,
             requires_payment: finalRequiresPayment,
@@ -4448,7 +4450,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
           };
           const { data: uData2, error: uErr2 } = await supabaseAdmin
             .from('students')
-            .update(corePayload)
+            .update(stringifiedPayload)
             .eq('id', currentStudent.id)
             .select();
           if (!uErr2 && uData2 && uData2.length > 0) {
@@ -4457,11 +4459,12 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         } catch (e2: any) {}
       }
 
-      // Tier 3: Convert subscribed_plans to JSON string if column is text
+      // Tier 3: Core payload including is_pro & subscribed_plans without assigned_classes
       if (!updateSuccess) {
         try {
-          const stringPayload = {
-            subscribed_plans: JSON.stringify(subscribedPlans),
+          const corePayload = {
+            subscribed_plans: subscribedPlans,
+            is_pro: finalIsPro,
             package_name: packageName,
             payment_status: finalPaymentStatus,
             requires_payment: finalRequiresPayment,
@@ -4471,7 +4474,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
           };
           const { data: uData3, error: uErr3 } = await supabaseAdmin
             .from('students')
-            .update(stringPayload)
+            .update(corePayload)
             .eq('id', currentStudent.id)
             .select();
           if (!uErr3 && uData3 && uData3.length > 0) {
@@ -4530,7 +4533,31 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         });
       }
 
-      const finalProfile = verifiedData ? { ...verifiedData, ...planData } : { ...currentStudent, ...planData };
+      const parseArrayHelper = (val: any, fallback: string[]) => {
+        if (Array.isArray(val)) return val;
+        if (typeof val === 'string' && val.trim()) {
+          try {
+            const parsed = JSON.parse(val);
+            if (Array.isArray(parsed)) return parsed;
+          } catch {
+            return [val];
+          }
+        }
+        return fallback;
+      };
+
+      const finalProfile = verifiedData
+        ? {
+            ...currentStudent,
+            ...verifiedData,
+            subscribed_plans: parseArrayHelper(verifiedData.subscribed_plans, subscribedPlans),
+            assigned_classes: parseArrayHelper(verifiedData.assigned_classes, Array.isArray(assignedClasses) ? assignedClasses : []),
+            is_pro: typeof verifiedData.is_pro === 'boolean' ? verifiedData.is_pro : finalIsPro,
+            package_name: verifiedData.package_name || packageName,
+            payment_status: verifiedData.payment_status || finalPaymentStatus,
+            requires_payment: typeof verifiedData.requires_payment === 'boolean' ? verifiedData.requires_payment : finalRequiresPayment,
+          }
+        : { ...currentStudent, ...planData };
 
       console.log(`[DEBUG: Plan Update API RESPONSE] Student ID: ${currentStudent.id}`, {
         success: true,

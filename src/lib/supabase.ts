@@ -22,6 +22,7 @@ export const supabase = createClient(
 export const ADMIN_EMAILS = [
   'shsvirtualadmin@gmail.com',
   'shsteachersemail@gmail.com',
+  'itxakira67@gmail.com',
 ];
 
 export function isAdminEmail(email?: string | null): boolean {
@@ -388,13 +389,28 @@ export function normalizeStudentProfileFromRow(data: any, fallbackUserId?: strin
 
   const isExplicitlyPro = typeof data.is_pro === 'boolean' ? data.is_pro : null;
 
-  const isPro = isAdmin ||
-    (isExplicitlyPro !== null ? isExplicitlyPro : (
-      rawPaymentStatus === 'Verified & Paid' ||
-      hasNonFreePlan ||
-      (pkgName.length > 0 && !pkgNameLower.includes('free'))
-    ));
+  const isPro = isExplicitlyPro !== null
+    ? isExplicitlyPro
+    : (
+        hasNonFreePlan ||
+        (pkgName.length > 0 && !pkgNameLower.includes('free')) ||
+        rawPaymentStatus === 'Verified & Paid'
+      );
 
+  let defaultPkgName = 'Free Plan';
+  if (subscribedPlans.includes('mdcat') || pkgNameLower.includes('mdcat')) {
+    defaultPkgName = 'MDCAT Medical Plan (Rs. 1,499/mo)';
+  } else if (subscribedPlans.includes('tcat') || pkgNameLower.includes('tcat') || pkgNameLower.includes('uet')) {
+    defaultPkgName = 'TCAT Engineering Plan (Rs. 1,499/mo)';
+  } else if (subscribedPlans.includes('fsc') || pkgNameLower.includes('fsc')) {
+    defaultPkgName = 'FSc Plan (Rs. 999/mo)';
+  } else if (subscribedPlans.includes('matric') || pkgNameLower.includes('matric')) {
+    defaultPkgName = 'Matric Plan (Rs. 499/mo)';
+  } else if (isPro) {
+    defaultPkgName = 'Boardly Pro Pass';
+  }
+
+  const finalPackageName = pkgName || defaultPkgName;
   const finalPaymentStatus = isPro ? 'Verified & Paid' : rawPaymentStatus;
   const finalRequiresPayment = isPro ? false : (typeof data.requires_payment === 'boolean' ? data.requires_payment : (!isAdmin && !isExistingBeforeRule));
 
@@ -411,7 +427,7 @@ export function normalizeStudentProfileFromRow(data: any, fallbackUserId?: strin
     sign_up_method: data.sign_up_method || 'Google',
     status: data.status || (finalRequiresPayment ? 'pending admin approval' : 'active'),
     is_registered: isReg,
-    package_name: pkgName || (isPro ? 'Boardly Pro Pass' : 'FBISE Annual Practice Pass'),
+    package_name: finalPackageName,
     subscribed_plans: subscribedPlans.length > 0 ? subscribedPlans : (isPro ? ['fsc'] : ['free']),
     assigned_classes: assignedClasses,
     is_pro: isPro,
