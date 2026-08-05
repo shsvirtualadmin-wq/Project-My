@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { StudyBuddyFormattedMessage } from './StudyBuddyFormattedMessage';
 import {
   History,
@@ -56,73 +57,30 @@ interface IntroScreenProps {
 }
 
 // ---------------------------------------------------------------------------
-// High-Performance Shared Observer & Scroll Animation Helpers
+// High-Performance Motion Animation Components
 // ---------------------------------------------------------------------------
-
-let globalScrollObserver: IntersectionObserver | null = null;
-
-function getGlobalScrollObserver(): IntersectionObserver | null {
-  if (typeof window === 'undefined') return null;
-  if (!globalScrollObserver && 'IntersectionObserver' in window) {
-    globalScrollObserver = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            const target = entry.target as HTMLElement;
-            target.classList.add('is-visible');
-            globalScrollObserver?.unobserve(target);
-          }
-        });
-      },
-      { threshold: 0.05, rootMargin: '50px 0px' }
-    );
-  }
-  return globalScrollObserver;
-}
 
 const ScrollFadeInCard: React.FC<{
   children: React.ReactNode;
   delayIndex?: number;
   className?: string;
 }> = ({ children, delayIndex = 0, className = '' }) => {
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const observer = getGlobalScrollObserver();
-    if (observer) {
-      observer.observe(el);
-    } else {
-      el.classList.add('is-visible');
-    }
-
-    // Safety fallback: ensure element is never permanently invisible
-    const timer = setTimeout(() => {
-      if (el && !el.classList.contains('is-visible')) {
-        el.classList.add('is-visible');
-      }
-    }, 1200);
-
-    return () => {
-      clearTimeout(timer);
-      if (observer && el) {
-        observer.unobserve(el);
-      }
-    };
-  }, []);
-
   return (
-    <div
-      ref={ref}
-      style={{
-        transitionDelay: `${Math.min(delayIndex * 50, 250)}ms`,
+    <motion.div
+      initial={{ opacity: 0, y: 25 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.1 }}
+      transition={{
+        duration: 0.35,
+        delay: Math.min(delayIndex * 0.04, 0.2),
+        ease: [0.16, 1, 0.3, 1],
       }}
-      className={`scroll-anim-card ${className}`}
+      whileHover={{ y: -6, transition: { duration: 0.2 } }}
+      style={{ willChange: 'transform, opacity' }}
+      className={className}
     >
       {children}
-    </div>
+    </motion.div>
   );
 };
 
@@ -174,7 +132,7 @@ const AnimatedStatCard: React.FC<{
         setCurrentVal(targetValue);
         localObs.disconnect();
       }
-    }, 1500);
+    }, 1200);
 
     return () => {
       clearTimeout(safetyTimer);
@@ -183,9 +141,15 @@ const AnimatedStatCard: React.FC<{
   }, [targetValue]);
 
   return (
-    <div
+    <motion.div
       ref={ref}
-      className="bg-slate-50/80 dark:bg-white/[0.04] border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-3.5 text-center relative overflow-hidden group hover:border-[#F2B90C]/50 transition-colors"
+      initial={{ opacity: 0, scale: 0.94, y: 15 }}
+      whileInView={{ opacity: 1, scale: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.1 }}
+      transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+      whileHover={{ y: -6, scale: 1.02, transition: { duration: 0.2 } }}
+      style={{ willChange: 'transform, opacity' }}
+      className="bg-slate-50/80 dark:bg-white/[0.04] border border-dashed border-slate-300 dark:border-white/15 rounded-2xl p-3.5 text-center relative overflow-hidden group hover:border-[#F2B90C]/80 hover:shadow-lg hover:shadow-[#F2B90C]/10 transition-colors cursor-default"
     >
       <div className="absolute -left-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-r border-slate-300 dark:border-white/10" />
       <div className="absolute -right-2 top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white dark:bg-[#141414] border-l border-slate-300 dark:border-white/10" />
@@ -195,7 +159,7 @@ const AnimatedStatCard: React.FC<{
       <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-300">
         {label}
       </span>
-    </div>
+    </motion.div>
   );
 };
 
@@ -203,53 +167,85 @@ const AnimatedTableRow: React.FC<{
   children: React.ReactNode;
   delayIndex: number;
 }> = ({ children, delayIndex }) => {
-  const ref = useRef<HTMLTableRowElement>(null);
-
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-
-    const observer = getGlobalScrollObserver();
-    if (observer) {
-      observer.observe(el);
-    } else {
-      el.classList.add('is-visible');
-    }
-
-    const timer = setTimeout(() => {
-      if (el && !el.classList.contains('is-visible')) {
-        el.classList.add('is-visible');
-      }
-    }, 1200);
-
-    return () => {
-      clearTimeout(timer);
-      if (observer && el) {
-        observer.unobserve(el);
-      }
-    };
-  }, []);
-
   return (
-    <tr
-      ref={ref}
-      style={{
-        transitionDelay: `${Math.min(delayIndex * 60, 250)}ms`,
+    <motion.tr
+      initial={{ opacity: 0, y: 15 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.1 }}
+      transition={{
+        duration: 0.35,
+        delay: Math.min(delayIndex * 0.04, 0.2),
+        ease: [0.16, 1, 0.3, 1],
       }}
-      className="scroll-anim-row hover:bg-slate-50 dark:hover:bg-white/[0.02]"
+      style={{ willChange: 'transform, opacity' }}
+      className="hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-colors"
     >
       {children}
-    </tr>
+    </motion.tr>
   );
 };
 
-const TypewriterChatPreview: React.FC<{ fullText: string }> = ({ fullText }) => {
+const TypewriterChatPreview: React.FC<{ fullText: string }> = React.memo(({ fullText }) => {
+  const [displayedText, setDisplayedText] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let animationFrameId: number;
+    let lastTime = 0;
+    const words = fullText.split(/(\s+)/);
+    let wordIndex = 0;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsTyping(true);
+
+          const step = (timestamp: number) => {
+            if (!lastTime) lastTime = timestamp;
+            const elapsed = timestamp - lastTime;
+
+            if (elapsed > 22) {
+              lastTime = timestamp;
+              wordIndex = Math.min(wordIndex + 2, words.length);
+              setDisplayedText(words.slice(0, wordIndex).join(''));
+
+              if (wordIndex >= words.length) {
+                setDisplayedText(fullText);
+                setIsTyping(false);
+                return;
+              }
+            }
+            animationFrameId = requestAnimationFrame(step);
+          };
+
+          animationFrameId = requestAnimationFrame(step);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (ref.current) observer.observe(ref.current);
+    return () => {
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
+    };
+  }, [fullText]);
+
   return (
-    <div className="relative">
-      <StudyBuddyFormattedMessage content={fullText} />
+    <div ref={ref} className="relative">
+      <StudyBuddyFormattedMessage content={displayedText} />
+      {isTyping && (
+        <motion.span
+          animate={{ opacity: [1, 0, 1] }}
+          transition={{ repeat: Infinity, duration: 0.5 }}
+          style={{ willChange: 'opacity' }}
+          className="inline-block w-2 h-4 bg-[#F2B90C] ml-1 align-middle rounded-xs shadow-xs shadow-[#F2B90C]"
+        />
+      )}
     </div>
   );
-};
+});
 
 const CarouselLogoItem: React.FC<{ inst: any }> = ({ inst }) => {
   const [imgFailed, setImgFailed] = useState(false);
@@ -557,49 +553,78 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
            ========================================================================= */}
         <section id="hero" className="space-y-6">
           <div className="bg-white dark:bg-[#141414] text-slate-900 dark:text-white rounded-3xl p-6 sm:p-10 border border-slate-200/90 dark:border-white/10 shadow-lg relative overflow-hidden flex flex-col justify-between gap-8 transition-colors duration-200">
-            {/* Background Glow Effect */}
-            <div className="absolute top-0 right-0 w-80 h-80 bg-[#F2B90C]/[0.05] dark:bg-[#F2B90C]/0.08 rounded-full blur-3xl pointer-events-none" />
+            {/* Background Glow Effect with Ambient Looping Float */}
+            <motion.div
+              animate={{ y: [0, -8, 0], scale: [1, 1.05, 1] }}
+              transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+              style={{ willChange: 'transform' }}
+              className="absolute -top-10 -right-10 w-96 h-96 bg-[#F2B90C]/[0.08] dark:bg-[#F2B90C]/12 rounded-full blur-3xl pointer-events-none"
+            />
 
             <div className="flex flex-wrap items-center justify-between gap-3 relative z-10">
-              <div className="inline-flex items-center gap-2 bg-[#F2B90C]/15 dark:bg-[#F2B90C]/20 border border-[#F2B90C]/30 text-amber-900 dark:text-[#F2B90C] px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider">
+              <motion.div
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                style={{ willChange: 'transform, opacity' }}
+                className="inline-flex items-center gap-2 bg-[#F2B90C]/15 dark:bg-[#F2B90C]/20 border border-[#F2B90C]/30 text-amber-900 dark:text-[#F2B90C] px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider"
+              >
                 <Sparkles className="w-3.5 h-3.5 text-amber-700 dark:text-[#F2B90C]" />
                 <span>FBISE & Entrance Exam Academy Platform</span>
-              </div>
+              </motion.div>
 
-              <div className="flex items-center gap-2">
+              <motion.div
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                style={{ willChange: 'transform, opacity' }}
+                className="flex items-center gap-2"
+              >
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 text-xs font-extrabold border border-emerald-500/30">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                   <span>2026 Session Live</span>
                 </span>
-              </div>
+              </motion.div>
             </div>
 
-            <div className="space-y-4 relative z-10 max-w-3xl">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.05, ease: [0.16, 1, 0.3, 1] }}
+              style={{ willChange: 'transform, opacity' }}
+              className="space-y-4 relative z-10 max-w-3xl"
+            >
               <h1 className="font-['Space_Grotesk'] text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-white leading-[1.15] tracking-tight">
                 Master Every Chapter with Intelligent MCQs & AI Explanations
               </h1>
               <p className="text-slate-600 dark:text-slate-300 text-sm sm:text-base lg:text-lg leading-relaxed font-normal">
                 Prepare for SSC & HSSC Federal Board exams, PMDC MDCAT Medical, and UET Taxila TCAT entrance tests with chapter-wise SLO question banks, step-by-step AI reasoning, and performance analytics.
               </p>
-            </div>
+            </motion.div>
 
             <div className="space-y-6 relative z-10">
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
                   onClick={onSelectGradesFlow || onContinue}
-                  className="bg-[#F2B90C] hover:bg-[#E0A800] text-[#0A0A0A] font-extrabold py-4 px-8 rounded-full transition-all active:scale-95 shadow-md flex items-center justify-center gap-2.5 text-sm sm:text-base cursor-pointer"
+                  className="bg-[#F2B90C] hover:bg-[#E0A800] text-[#0A0A0A] font-extrabold py-4 px-8 rounded-full shadow-md hover:shadow-lg hover:shadow-[#F2B90C]/20 flex items-center justify-center gap-2.5 text-sm sm:text-base cursor-pointer transition-all"
                 >
                   <span>Start Practice Test</span>
                   <ArrowRight className="w-4 h-4 stroke-[3]" />
-                </button>
+                </motion.button>
 
-                <button
+                <motion.button
+                  whileHover={{ scale: 1.03, y: -2 }}
+                  whileTap={{ scale: 0.97 }}
+                  transition={{ duration: 0.15 }}
                   onClick={onOpenLmsPortal}
-                  className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-white/10 dark:hover:bg-white/20 border border-slate-900 dark:border-white/15 font-bold py-4 px-6 rounded-full transition-all active:scale-95 flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
+                  className="bg-slate-900 text-white hover:bg-slate-800 dark:bg-white/10 dark:hover:bg-white/20 border border-slate-900 dark:border-white/15 font-bold py-4 px-6 rounded-full flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer transition-all"
                 >
                   <BookOpen className="w-4 h-4 text-[#F2B90C]" />
                   <span>Student LMS Portal</span>
-                </button>
+                </motion.button>
               </div>
 
               {/* Dynamic Trust-Signal Line */}
@@ -1065,12 +1090,24 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
             </div>
 
             {/* Right Column: Simulated Chat Preview Box */}
-            <div className="bg-slate-50 dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 rounded-2xl p-4 sm:p-5 shadow-inner space-y-3 font-sans">
+            <motion.div
+              initial={{ opacity: 0, x: 25, scale: 0.98 }}
+              whileInView={{ opacity: 1, x: 0, scale: 1 }}
+              viewport={{ once: true, amount: 0.1 }}
+              transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              whileHover={{ y: -4, transition: { duration: 0.2 } }}
+              style={{ willChange: 'transform, opacity' }}
+              className="bg-slate-50 dark:bg-[#1A1A1A] border border-slate-200 dark:border-white/10 hover:border-[#F2B90C]/50 rounded-2xl p-4 sm:p-5 shadow-inner hover:shadow-xl hover:shadow-[#F2B90C]/10 transition-all space-y-3 font-sans relative"
+            >
               <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-white/10">
                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-[#F2B90C] text-[#0A0A0A] font-extrabold text-xs flex items-center justify-center">
+                  <motion.div
+                    animate={{ scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-7 h-7 rounded-lg bg-[#F2B90C] text-[#0A0A0A] font-extrabold text-xs flex items-center justify-center shadow-xs"
+                  >
                     <Bot className="w-4 h-4" />
-                  </div>
+                  </motion.div>
                   <div>
                     <h4 className="text-xs font-bold text-slate-900 dark:text-white">Study Buddy AI</h4>
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1.5">
@@ -1082,8 +1119,9 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
                     </span>
                   </div>
                 </div>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                  Live Preview
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-[#F2B90C] animate-pulse" />
+                  <span>Live Preview</span>
                 </span>
               </div>
 
@@ -1096,7 +1134,7 @@ export const IntroScreen: React.FC<IntroScreenProps> = React.memo(({
 
               {/* Chat Message 2: Study Buddy AI */}
               <div className="flex justify-start">
-                <div className="bg-[#111827] border border-amber-500/20 text-slate-100 rounded-2xl rounded-tl-xs p-3.5 text-xs max-w-[92%] shadow-sm leading-relaxed">
+                <div className="bg-[#111827] border border-amber-500/20 text-slate-100 rounded-2xl rounded-tl-xs p-3.5 text-xs max-w-[92%] shadow-sm leading-relaxed relative overflow-hidden">
                   <TypewriterChatPreview
                     fullText={`**Great question! Let’s break this down via Einstein’s Photoelectric Equation:**
 
@@ -1110,7 +1148,7 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
                   />
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
 
@@ -1310,9 +1348,15 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
             {FAQ_DATA.map((faq, idx) => {
               const isOpen = expandedFaq === idx;
               return (
-                <div
+                <motion.div
                   key={idx}
-                  className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-2xl overflow-hidden transition-all shadow-xs"
+                  initial={{ opacity: 0, y: 15 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, amount: 0.1 }}
+                  transition={{ duration: 0.35, delay: idx * 0.03, ease: [0.16, 1, 0.3, 1] }}
+                  whileHover={{ y: -2, transition: { duration: 0.15 } }}
+                  style={{ willChange: 'transform, opacity' }}
+                  className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 hover:border-[#F2B90C]/50 rounded-2xl overflow-hidden transition-colors shadow-xs"
                 >
                   <button
                     onClick={() => setExpandedFaq(isOpen ? null : idx)}
@@ -1326,12 +1370,20 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
                     )}
                   </button>
 
-                  {isOpen && (
-                    <div className="px-4 sm:px-5 pb-5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3 font-normal">
-                      {faq.answer}
-                    </div>
-                  )}
-                </div>
+                  <AnimatePresence initial={false}>
+                    {isOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+                        className="px-4 sm:px-5 pb-5 text-xs text-slate-600 dark:text-slate-300 leading-relaxed border-t border-slate-100 dark:border-white/5 pt-3 font-normal overflow-hidden"
+                      >
+                        {faq.answer}
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </motion.div>
               );
             })}
           </div>
@@ -1356,45 +1408,53 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
 
           {/* 4-Card Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                <Eye className="w-4 h-4" />
+            <ScrollFadeInCard delayIndex={0}>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 hover:border-emerald-500/40 space-y-2 h-full transition-all">
+                <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                  <Eye className="w-4 h-4" />
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">What We Collect</h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                  Minimal account details (Name, Class, Track, Email/Phone) required purely to sync quiz history, Study Buddy conversations, and performance logs across devices.
+                </p>
               </div>
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white">What We Collect</h4>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                Minimal account details (Name, Class, Track, Email/Phone) required purely to sync quiz history, Study Buddy conversations, and performance logs across devices.
-              </p>
-            </div>
+            </ScrollFadeInCard>
 
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
-                <Lock className="w-4 h-4" />
+            <ScrollFadeInCard delayIndex={1}>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 hover:border-rose-500/40 space-y-2 h-full transition-all">
+                <div className="w-8 h-8 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/30 flex items-center justify-center shrink-0">
+                  <Lock className="w-4 h-4" />
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">What We Never Do</h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                  We never sell your personal data, track background device activity, or share your contact information with commercial third-party telemarketers or advertisers.
+                </p>
               </div>
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white">What We Never Do</h4>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                We never sell your personal data, track background device activity, or share your contact information with commercial third-party telemarketers or advertisers.
-              </p>
-            </div>
+            </ScrollFadeInCard>
 
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] border border-[#F2B90C]/30 flex items-center justify-center shrink-0">
-                <Trash2 className="w-4 h-4 text-[#F2B90C]" />
+            <ScrollFadeInCard delayIndex={2}>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 hover:border-[#F2B90C]/40 space-y-2 h-full transition-all">
+                <div className="w-8 h-8 rounded-lg bg-[#F2B90C]/15 text-[#0A0A0A] dark:text-[#F2B90C] border border-[#F2B90C]/30 flex items-center justify-center shrink-0">
+                  <Trash2 className="w-4 h-4 text-[#F2B90C]" />
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">User Data Control</h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                  You retain full ownership of your data. Request instant account wipes or progress erasures anytime directly from your profile settings or support.
+                </p>
               </div>
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white">User Data Control</h4>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                You retain full ownership of your data. Request instant account wipes or progress erasures anytime directly from your profile settings or support.
-              </p>
-            </div>
+            </ScrollFadeInCard>
 
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 space-y-2">
-              <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
-                <CreditCard className="w-4 h-4" />
+            <ScrollFadeInCard delayIndex={3}>
+              <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/5 hover:border-cyan-500/40 space-y-2 h-full transition-all">
+                <div className="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-4 h-4" />
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 dark:text-white">Transparent Payments & No Refunds</h4>
+                <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
+                  Payment transfers for optional premium unlocks are logged securely with verified admin receipts. All purchases are final — strict no-refunds policy once payment is submitted.
+                </p>
               </div>
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white">Transparent Payments & No Refunds</h4>
-              <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-normal">
-                Payment transfers for optional premium unlocks are logged securely with verified admin receipts. All purchases are final — strict no-refunds policy once payment is submitted.
-              </p>
-            </div>
+            </ScrollFadeInCard>
           </div>
 
           {/* Links to Legal Policies */}
@@ -1659,30 +1719,50 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
       {/* =========================================================================
           FLOATING BACK TO TOP BUTTON
          ========================================================================= */}
-      {showScrollTop && (
-        <div className="fixed bottom-20 right-5 sm:bottom-24 sm:right-6 z-40 pointer-events-none">
-          <button
-            onClick={scrollToTop}
-            className="pointer-events-auto w-10 h-10 rounded-full bg-slate-900 text-white dark:bg-white/20 dark:hover:bg-white/30 backdrop-blur-md border border-slate-700 dark:border-white/20 shadow-lg flex items-center justify-center hover:bg-slate-800 active:scale-95 transition-all cursor-pointer"
-            aria-label="Scroll back to top"
-            title="Back to Top"
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.8, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 10 }}
+            transition={{ duration: 0.2 }}
+            className="fixed bottom-20 right-5 sm:bottom-24 sm:right-6 z-40 pointer-events-none"
           >
-            <ChevronUp className="w-5 h-5" />
-          </button>
-        </div>
-      )}
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={scrollToTop}
+              className="pointer-events-auto w-10 h-10 rounded-full bg-slate-900 text-white dark:bg-white/20 dark:hover:bg-white/30 backdrop-blur-md border border-slate-700 dark:border-white/20 shadow-lg flex items-center justify-center hover:bg-slate-800 transition-all cursor-pointer"
+              aria-label="Scroll back to top"
+              title="Back to Top"
+            >
+              <ChevronUp className="w-5 h-5" />
+            </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* =========================================================================
           LEGAL POLICIES POPUP MODAL
          ========================================================================= */}
-      {activeLegalModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
-          onClick={(e) => {
-            if (e.target === e.currentTarget) setActiveLegalModal(null);
-          }}
-        >
-          <div className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-3xl p-6 sm:p-8 max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative text-slate-900 dark:text-white space-y-5 animate-ios-spring">
+      <AnimatePresence>
+        {activeLegalModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-900/60 dark:bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) setActiveLegalModal(null);
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.92, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.92, y: 20, opacity: 0 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="bg-white dark:bg-[#141414] border border-slate-200/80 dark:border-white/10 rounded-3xl p-6 sm:p-8 max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl relative text-slate-900 dark:text-white space-y-5"
+            >
             <button
               onClick={() => setActiveLegalModal(null)}
               className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-all cursor-pointer"
@@ -1799,9 +1879,10 @@ $$K.E._{\\text{max}} = h\\nu - \\Phi$$
             >
               Close
             </button>
-          </div>
-        </div>
-      )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 });

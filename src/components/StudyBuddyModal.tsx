@@ -136,6 +136,60 @@ function generateNewConversationId(): string {
   return `conv_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
 }
 
+const ChatMessageItem: React.FC<{ msg: ChatMessage }> = React.memo(({ msg }) => {
+  const isUser = msg.role === 'user';
+  return (
+    <div
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 100px' }}
+      className={`flex flex-col ${isUser ? 'items-end ml-auto max-w-[85%] sm:max-w-[78%]' : 'items-start mr-auto max-w-[92%] sm:max-w-[85%]'}`}
+    >
+      {isUser ? (
+        /* STUDENT BUBBLE */
+        <div className="space-y-1 w-full">
+          <div className="flex items-center justify-end gap-1 px-1">
+            <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider">
+              You
+            </span>
+            <User className="w-3 h-3 text-amber-400" />
+          </div>
+          <div className="p-3.5 sm:p-4 rounded-2xl rounded-tr-xs bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 font-medium shadow-md border border-amber-300/40">
+            <StudyBuddyFormattedMessage content={msg.text} isUser={true} />
+          </div>
+        </div>
+      ) : (
+        /* AI TUTOR BUBBLE */
+        <div className="space-y-1 w-full">
+          <div className="flex items-center gap-1.5 px-1">
+            <div className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center">
+              <GraduationCap className="w-3 h-3" />
+            </div>
+            <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">
+              Study Buddy
+            </span>
+            <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-full font-semibold">
+              AI Tutor
+            </span>
+          </div>
+          <div className="p-4 sm:p-5 rounded-2xl rounded-tl-xs bg-[#131B29] border border-amber-500/20 text-slate-100 shadow-lg space-y-2">
+            {(() => {
+              const sanitized = sanitizeStudyBuddyText(msg.text);
+              if (!sanitized) {
+                return (
+                  <div className="flex items-center gap-2 text-amber-300 text-xs font-medium py-1 animate-pulse">
+                    <Sparkles className="w-4 h-4 animate-spin text-amber-400" />
+                    Analyzing your question and generating step-by-step solution...
+                  </div>
+                );
+              }
+              return <StudyBuddyFormattedMessage content={msg.text} isUser={false} />;
+            })()}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
 export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
   isOpen,
   onClose,
@@ -659,59 +713,9 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
           ) : (
             /* ACTIVE MESSAGES LIST */
             <>
-              {messages.map((msg) => {
-                const isUser = msg.role === 'user';
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${isUser ? 'items-end ml-auto max-w-[85%] sm:max-w-[78%]' : 'items-start mr-auto max-w-[92%] sm:max-w-[85%]'}`}
-                  >
-                    {isUser ? (
-                      /* STUDENT BUBBLE */
-                      <div className="space-y-1 w-full">
-                        <div className="flex items-center justify-end gap-1 px-1">
-                          <span className="text-[10px] text-amber-300/80 font-bold uppercase tracking-wider">
-                            You
-                          </span>
-                          <User className="w-3 h-3 text-amber-400" />
-                        </div>
-                        <div className="p-3.5 sm:p-4 rounded-2xl rounded-tr-xs bg-gradient-to-r from-amber-500 via-amber-400 to-amber-500 text-slate-950 font-medium shadow-md border border-amber-300/40">
-                          <StudyBuddyFormattedMessage content={msg.text} isUser={true} />
-                        </div>
-                      </div>
-                    ) : (
-                      /* AI TUTOR BUBBLE */
-                      <div className="space-y-1 w-full">
-                        <div className="flex items-center gap-1.5 px-1">
-                          <div className="w-4 h-4 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                            <GraduationCap className="w-3 h-3" />
-                          </div>
-                          <span className="text-[10px] text-amber-300 font-bold uppercase tracking-wider">
-                            Study Buddy
-                          </span>
-                          <span className="text-[9px] px-1.5 py-0.2 bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-full font-semibold">
-                            AI Tutor
-                          </span>
-                        </div>
-                        <div className="p-4 sm:p-5 rounded-2xl rounded-tl-xs bg-[#131B29] border border-amber-500/20 text-slate-100 shadow-lg space-y-2">
-                          {(() => {
-                            const sanitized = sanitizeStudyBuddyText(msg.text);
-                            if (!sanitized) {
-                              return (
-                                <div className="flex items-center gap-2 text-amber-300 text-xs font-medium py-1 animate-pulse">
-                                  <Sparkles className="w-4 h-4 animate-spin text-amber-400" />
-                                  Analyzing your question and generating step-by-step solution...
-                                </div>
-                              );
-                            }
-                            return <StudyBuddyFormattedMessage content={msg.text} isUser={false} />;
-                          })()}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {messages.map((msg) => (
+                <ChatMessageItem key={msg.id} msg={msg} />
+              ))}
               <div ref={messagesEndRef} />
             </>
           )}

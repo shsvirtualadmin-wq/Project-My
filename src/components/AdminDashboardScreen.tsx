@@ -393,8 +393,12 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
               : r
           )
         );
-        const updatedStudents = await fetchAllStudentsFromSupabase();
+        const [updatedStudents, updatedLogs] = await Promise.all([
+          fetchAllStudentsFromSupabase(),
+          fetchAdminActivityLogsFromSupabase(detectedEmail),
+        ]);
         setStudents(updatedStudents);
+        setActivityLogs(updatedLogs);
 
         setPaymentToast({
           type: 'success',
@@ -413,25 +417,42 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
 
   const handleConfirmRejectPaymentRequest = async () => {
     if (!rejectingRequest) return;
+    const trimmedReason = rejectNote.trim();
+    if (!trimmedReason) {
+      setPaymentToast({
+        type: 'error',
+        message: 'A rejection reason is required before denying a payment request.',
+      });
+      return;
+    }
+
     setReviewingRequestId(rejectingRequest.id);
     try {
       const res = await reviewPaymentRequestInSupabase(
         rejectingRequest.id,
         'rejected',
-        rejectNote,
+        trimmedReason,
         detectedEmail
       );
       if (res.success) {
         setPaymentRequests((prev) =>
           prev.map((r) =>
             r.id === rejectingRequest.id
-              ? { ...r, status: 'rejected', admin_note: rejectNote, reviewed_at: new Date().toISOString(), reviewed_by: detectedEmail }
+              ? { ...r, status: 'rejected', admin_note: trimmedReason, reviewed_at: new Date().toISOString(), reviewed_by: detectedEmail }
               : r
           )
         );
+
+        const [updatedStudents, updatedLogs] = await Promise.all([
+          fetchAllStudentsFromSupabase(),
+          fetchAdminActivityLogsFromSupabase(detectedEmail),
+        ]);
+        setStudents(updatedStudents);
+        setActivityLogs(updatedLogs);
+
         setPaymentToast({
           type: 'success',
-          message: `Payment request for ${rejectingRequest.student_name} marked as rejected. Email sent to student.`,
+          message: `Payment request for ${rejectingRequest.student_name} marked as rejected with reason recorded.`,
         });
         setTimeout(() => setPaymentToast(null), 5000);
         setRejectingRequest(null);

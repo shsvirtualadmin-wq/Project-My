@@ -774,6 +774,12 @@ export async function fetchAllStudentsFromSupabase(): Promise<StudentProfile[]> 
       sign_up_method: row.sign_up_method || 'Email/Password',
       created_at: row.created_at || new Date().toISOString(),
       updated_at: row.updated_at,
+      payment_status: row.payment_status || 'Unpaid',
+      requires_payment: row.requires_payment ?? true,
+      package_name: row.package_name || '',
+      subscribed_plans: row.subscribed_plans || [],
+      dream_university: row.dream_university || row.target_university || '',
+      access_expires: row.access_expires || '',
     }));
   } catch (err) {
     console.error('Failed to fetch students from Supabase:', err);
@@ -2050,6 +2056,7 @@ export interface PaymentRequest {
   transaction_reference?: string;
   status: 'pending' | 'approved' | 'rejected';
   admin_note?: string;
+  course_tier?: string;
   created_at: string;
   reviewed_at?: string;
   reviewed_by?: string;

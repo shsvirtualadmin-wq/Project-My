@@ -3932,54 +3932,70 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
   // In-memory payment requests fallback store (when Supabase payment_requests table is not provisioned)
   const inMemoryPaymentRequests: any[] = [];
 
-  // API Endpoint: Submit Payment Request (WhatsApp Verification Flow)
-  app.post("/api/payment-requests/submit", express.json(), async (req: express.Request, res: express.Response) => {
-    try {
-      const {
-        student_id,
-        student_name,
-        studentEmail,
-        student_email,
-        studentName,
-        payment_method,
-        paymentMethod,
-        amount,
-        transaction_reference,
-        transactionRef,
-        course_tier,
-        tier
-      } = req.body || {};
-
-      const resolvedStudentId = student_id || `anon-${Date.now()}`;
-      const resolvedName = student_name || studentName || 'Student';
-      const resolvedEmail = (student_email || studentEmail || '').toLowerCase().trim();
-      const resolvedMethod = payment_method || paymentMethod || 'JazzCash';
-      const resolvedAmount = amount || '0';
-      const resolvedTrx = (transaction_reference || transactionRef || '').trim();
-      const resolvedTier = course_tier || tier || '';
-
-      if (!resolvedEmail || !resolvedMethod || !resolvedAmount) {
-        return res.status(400).json({ success: false, error: "Missing required fields: student_email, payment_method, amount." });
+  // API Endpoint: Submit Payment Request (WhatsApp / Direct Proof Verification Flow)
+  app.post(
+    "/api/payment-requests/submit",
+    (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const contentType = req.headers['content-type'] || '';
+      if (contentType.includes('multipart/form-data')) {
+        driveUploadMulter.single('file')(req, res, next);
+      } else {
+        express.json()(req, res, next);
       }
+    },
+    async (req: express.Request, res: express.Response) => {
+      try {
+        const {
+          student_id,
+          student_name,
+          studentEmail,
+          student_email,
+          studentName,
+          payment_method,
+          paymentMethod,
+          amount,
+          transaction_reference,
+          transactionRef,
+          course_tier,
+          tier
+        } = req.body || {};
 
-      const driveFileId = `wa-${Date.now()}`;
-      const driveFileUrl = "WhatsApp Submission (+923222314436)";
+        const resolvedStudentId = student_id || `anon-${Date.now()}`;
+        const resolvedName = student_name || studentName || 'Student';
+        const resolvedEmail = (student_email || studentEmail || '').toLowerCase().trim();
+        const resolvedMethod = payment_method || paymentMethod || 'JazzCash';
+        const resolvedAmount = amount || '0';
+        const resolvedTrx = (transaction_reference || transactionRef || '').trim();
+        const resolvedTier = course_tier || tier || '';
 
-      const supabaseAdmin = getSupabaseAdminClient() || getAuthClient(req);
-      const newRecord = {
-        id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-        student_id: String(resolvedStudentId),
-        student_name: String(resolvedName),
-        student_email: String(resolvedEmail),
-        payment_method: String(resolvedMethod),
-        amount: Number(resolvedAmount) || resolvedAmount,
-        drive_file_id: driveFileId,
-        drive_file_url: driveFileUrl,
-        transaction_reference: String(resolvedTrx),
-        status: 'pending',
-        admin_note: resolvedTier ? `Track / Course Tier: ${resolvedTier}` : undefined,
-        created_at: new Date().toISOString(),
-      };
+        if (!resolvedEmail || !resolvedMethod || !resolvedAmount) {
+          return res.status(400).json({ success: false, error: "Missing required fields: student_email, payment_method, amount." });
+        }
+
+        let driveFileId = `wa-${Date.now()}`;
+        let driveFileUrl = "WhatsApp Submission (+923222314436)";
+
+        if (req.file) {
+          driveFileId = req.file.filename || `file-${Date.now()}`;
+          driveFileUrl = `/api/drive-file/${req.file.filename}`;
+        }
+
+        const supabaseAdmin = getSupabaseAdminClient() || getAuthClient(req);
+        const newRecord = {
+          id: `pr-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          student_id: String(resolvedStudentId),
+          student_name: String(resolvedName),
+          student_email: String(resolvedEmail),
+          payment_method: String(resolvedMethod),
+          amount: Number(resolvedAmount) || resolvedAmount,
+          drive_file_id: driveFileId,
+          drive_file_url: driveFileUrl,
+          transaction_reference: String(resolvedTrx),
+          status: 'pending',
+          course_tier: resolvedTier || undefined,
+          admin_note: resolvedTier ? `Class / Track: ${resolvedTier}` : undefined,
+          created_at: new Date().toISOString(),
+        };
 
       let insertedData = newRecord;
       inMemoryPaymentRequests.unshift(newRecord);

@@ -10,7 +10,7 @@ interface StudyBuddyFormattedMessageProps {
   isUser?: boolean;
 }
 
-export const StudyBuddyFormattedMessage: React.FC<StudyBuddyFormattedMessageProps> = ({
+export const StudyBuddyFormattedMessage: React.FC<StudyBuddyFormattedMessageProps> = React.memo(({
   content,
   className = '',
   isUser = false,
@@ -21,6 +21,7 @@ export const StudyBuddyFormattedMessage: React.FC<StudyBuddyFormattedMessageProp
 
   return (
     <div
+      style={{ contentVisibility: 'auto', containIntrinsicSize: '0 80px' }}
       className={`study-buddy-message font-sans space-y-2 text-xs sm:text-sm leading-relaxed overflow-x-auto ${
         isUser ? 'text-slate-950 font-medium' : 'text-slate-100'
       } ${className}`}
@@ -126,6 +127,6 @@ export const StudyBuddyFormattedMessage: React.FC<StudyBuddyFormattedMessageProp
       </ReactMarkdown>
     </div>
   );
-};
+});
 
 export default StudyBuddyFormattedMessage;
