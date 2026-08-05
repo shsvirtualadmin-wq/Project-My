@@ -263,6 +263,8 @@ export interface StudentProfile {
   grade: string;
   stream?: string;
   subjects?: string[] | string;
+  dream_university?: string;
+  target_university?: string;
   sign_up_method: string; // 'Google' | 'Email/Password'
   status?: string; // 'active' | 'pending admin approval'
   is_registered?: boolean;
@@ -1158,6 +1160,8 @@ export async function fetchStudentProfileFromSupabase(
             grade: data.grade || '',
             stream: data.stream || '',
             subjects: data.subjects || [],
+            dream_university: data.dream_university || data.target_university || '',
+            target_university: data.target_university || data.dream_university || '',
             sign_up_method: data.sign_up_method || 'Google',
             status: data.status || (requiresPayment ? 'pending admin approval' : 'active'),
             is_registered: isReg,

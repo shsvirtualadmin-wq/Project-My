@@ -319,6 +319,17 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
               {profile.stream || 'Pre-Medical Stream'}
             </span>
           </div>
+
+          {/* Target University */}
+          <div className="p-3.5 bg-slate-50 dark:bg-[#202020] border border-black/5 dark:border-white/5 rounded-2xl space-y-1 sm:col-span-3">
+            <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase tracking-wider">
+              <GraduationCap className="w-3.5 h-3.5 text-[#F2B90C]" />
+              <span>Target University</span>
+            </div>
+            <span className="font-extrabold text-sm text-[#0A0A0A] dark:text-white block">
+              {profile.dream_university || profile.target_university || 'Not specified'}
+            </span>
+          </div>
         </div>
 
         {/* Gray Info Box */}

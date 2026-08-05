@@ -305,6 +305,35 @@ export function App() {
   );
   const isPaymentApprovedOrExempt = isAdmin || isExistingStudentUnaffected;
 
+  // Auto-sync selectedClass & selectedGroup to student's profile grade & stream
+  useEffect(() => {
+    if (userProfile && isRegisteredStudent && !isAdmin) {
+      const g = (userProfile.grade || '').trim();
+      const s = (userProfile.stream || '').trim();
+      let targetC: BoardClass = 11;
+      let targetG = 'Pre-Medical';
+
+      if (g.toUpperCase().includes('MDCAT') || s.toUpperCase().includes('MDCAT')) {
+        targetC = 'MDCAT';
+        targetG = 'MDCAT';
+      } else if (g.toUpperCase().includes('TCAT') || s.toUpperCase().includes('TCAT')) {
+        targetC = 'TCAT';
+        targetG = s || 'Pre-Engineering';
+      } else {
+        const numMatch = g.match(/\d+/);
+        if (numMatch) {
+          targetC = parseInt(numMatch[0], 10) as BoardClass;
+        }
+        targetG = s || 'Pre-Medical';
+      }
+
+      if (selectedClass !== targetC || selectedGroup !== targetG) {
+        setSelectedClass(targetC);
+        setSelectedGroup(targetG);
+      }
+    }
+  }, [userProfile, isRegisteredStudent, isAdmin, selectedClass, selectedGroup]);
+
   const screenRef = useRef(screen);
   const selectedClassRef = useRef(selectedClass);
   const selectedGroupRef = useRef(selectedGroup);
@@ -1803,11 +1832,12 @@ export function App() {
                 )}
                 {screen === 'dashboard' && (
                   <ClassStreamDashboard
-                    classNum={selectedClass || 9}
-                    group={selectedGroup || 'Medical'}
+                    classNum={selectedClass || 11}
+                    group={selectedGroup || 'Pre-Medical'}
                     history={history}
                     isAdmin={isAdmin}
                     currentUser={currentUser}
+                    userProfile={userProfile}
                     isGenerating={isGenerating}
                     onOpenAuth={(intendedParams) => {
                       if (intendedParams) {

@@ -484,7 +484,7 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
           Join Scholario Exam Portal
         </h1>
         <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-          Complete your track selection, set your dream college, and unlock full prep materials.
+          Complete your track selection, set your target university, and unlock full prep materials.
         </p>
       </div>
 
@@ -493,7 +493,7 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
         <div className="flex items-center justify-between relative z-10 mb-2">
           {[
             { step: 1, label: 'Track' },
-            { step: 2, label: 'Dream College' },
+            { step: 2, label: 'Target University' },
             { step: 3, label: 'Welcome' },
             { step: 4, label: 'Challan' },
             { step: 5, label: 'Submit Proof' },
@@ -831,10 +831,10 @@ export const StudentRegistrationFlow: React.FC<StudentRegistrationFlowProps> = (
                 Step 2 of 5
               </span>
               <h2 className="text-lg font-black text-slate-900 dark:text-white">
-                Select Your Dream Institution
+                Select Your Target University
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Which target university or college are you aiming to join?
+                Which target university are you aiming to join?
               </p>
             </div>
             <button

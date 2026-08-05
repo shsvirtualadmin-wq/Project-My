@@ -7,7 +7,8 @@ import { getDashboardConfig, DASHBOARD_CONFIGS, DashboardStreamConfig } from '..
 import { SUBJECT_TOPICS, getSubjectTopicsForClass } from '../data/categories';
 import { PREBUILT_QUESTIONS, getPrebuiltQuestionsForSubject } from '../data/prebuiltQuestions';
 import { getBookmarkedQuestions, removeBookmark, saveBookmark, BookmarkedQuestion } from '../lib/bookmarks';
-import { fetchSharedCustomTopics, saveSharedCustomTopic, normalizeTopicName, fetchStudentMcqUsage, StudentMcqUsageInfo, User } from '../lib/supabase';
+import { fetchSharedCustomTopics, saveSharedCustomTopic, normalizeTopicName, fetchStudentMcqUsage, StudentMcqUsageInfo, User, StudentProfile } from '../lib/supabase';
+import { renderTargetUniversityBadge } from './InstitutionBadge';
 import { getSubjectBadgeStyle } from '../utils/subjectBadge';
 import { mapSubject } from '../utils/subjectMapper';
 import {
@@ -46,6 +47,7 @@ interface ClassStreamDashboardProps {
   history: HistoryItem[];
   isAdmin?: boolean;
   currentUser?: User | null;
+  userProfile?: StudentProfile | null;
   isGenerating?: boolean;
   onOpenAuth?: (intendedParams?: any) => void;
   onSelectStream: (cNum: BoardClass, grp: string) => void;
@@ -68,6 +70,7 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
   history,
   isAdmin = false,
   currentUser,
+  userProfile,
   isGenerating = false,
   onOpenAuth,
   onSelectStream,
@@ -356,54 +359,56 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
     <section className="dashboard-container screen animate-ios-spring text-left flex flex-col gap-3 sm:gap-4 pb-4">
       {/* Top Header & Stream Badge */}
       <div className="flex flex-col gap-2 bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-white/10 rounded-[24px] sm:rounded-[28px] p-3.5 sm:p-5 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <button
-            onClick={onBackToClasses}
-            className="text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>All Portals</span>
-          </button>
-
-          <div className="relative">
+        {isAdmin && (
+          <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200 dark:border-white/10 mb-1">
             <button
-              onClick={() => setShowStreamSelector(!showStreamSelector)}
-              className="flex items-center gap-1.5 text-xs font-extrabold bg-rose-500/10 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 px-3 py-1 rounded-full hover:bg-rose-500/20 active:scale-95 transition-all cursor-pointer"
+              onClick={onBackToClasses}
+              className="text-xs font-bold text-slate-700 dark:text-slate-300 hover:text-rose-600 dark:hover:text-rose-400 flex items-center gap-1 active:scale-95 transition-transform cursor-pointer"
             >
-              <Layers className="w-3.5 h-3.5" />
-              <span>Switch Portal</span>
-              <ChevronDown className="w-3.5 h-3.5" />
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>All Portals</span>
             </button>
 
-            {showStreamSelector && (
-              <div className="absolute right-0 top-9 z-50 w-64 bg-white dark:bg-[#2C2C2E] border border-slate-200 dark:border-white/10 rounded-2xl p-2 shadow-2xl max-h-72 overflow-y-auto">
-                <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-2 py-1">
-                  Select Class & Entry Portal
-                </div>
-                {DASHBOARD_CONFIGS.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      onSelectStream(item.classNum, item.group);
-                      setShowStreamSelector(false);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between hover:bg-slate-100 dark:hover:bg-[#3A3A3C] transition-colors ${
-                      item.classNum === classNum && item.group === group
-                        ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
-                        : 'text-slate-800 dark:text-white'
-                    }`}
-                  >
-                    <span>{item.shortTitle}</span>
-                    <span className="text-[10px] opacity-70">{item.levelTag}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowStreamSelector(!showStreamSelector)}
+                className="flex items-center gap-1.5 text-xs font-extrabold bg-rose-500/10 dark:bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/30 px-3 py-1 rounded-full hover:bg-rose-500/20 active:scale-95 transition-all cursor-pointer"
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>Switch Portal (Admin)</span>
+                <ChevronDown className="w-3.5 h-3.5" />
+              </button>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mt-1">
-          <div>
+              {showStreamSelector && (
+                <div className="absolute right-0 top-9 z-50 w-64 bg-white dark:bg-[#2C2C2E] border border-slate-200 dark:border-white/10 rounded-2xl p-2 shadow-2xl max-h-72 overflow-y-auto">
+                  <div className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider px-2 py-1">
+                    Select Class &amp; Entry Portal
+                  </div>
+                  {DASHBOARD_CONFIGS.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        onSelectStream(item.classNum, item.group);
+                        setShowStreamSelector(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between hover:bg-slate-100 dark:hover:bg-[#3A3A3C] transition-colors ${
+                        item.classNum === classNum && item.group === group
+                          ? 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400'
+                          : 'text-slate-800 dark:text-white'
+                      }`}
+                    >
+                      <span>{item.shortTitle}</span>
+                      <span className="text-[10px] opacity-70">{item.levelTag}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-1">
+          <div className="space-y-1.5">
             <div className="flex items-center gap-2">
               <span className={`text-[10px] font-extrabold tracking-wider uppercase text-white px-2.5 py-0.5 rounded-full ${config.badgeBg}`}>
                 {config.shortTitle}
@@ -412,12 +417,20 @@ export const ClassStreamDashboard: React.FC<ClassStreamDashboardProps> = ({
                 {config.levelTag}
               </span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight mt-1">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
               {config.title}
             </h1>
-            <p className="text-xs text-slate-600 dark:text-[#8E8E93] font-medium mt-0.5">
+            <p className="text-xs text-slate-600 dark:text-[#8E8E93] font-medium">
               {config.description}
             </p>
+
+            {/* Target University Badge */}
+            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
+              <span className="font-bold text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider">
+                Target University:
+              </span>
+              {renderTargetUniversityBadge(userProfile?.dream_university || userProfile?.target_university)}
+            </div>
           </div>
 
           {/* Core Stats Bar */}

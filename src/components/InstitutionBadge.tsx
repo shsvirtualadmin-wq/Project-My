@@ -1,4 +1,5 @@
 import React from 'react';
+import { GraduationCap } from 'lucide-react';
 
 export interface Institution {
   id: string;
@@ -333,3 +334,41 @@ export const InstitutionBadge: React.FC<InstitutionBadgeProps> = ({
     </div>
   );
 };
+
+export function renderTargetUniversityBadge(targetUniStr?: string, size: 'sm' | 'md' = 'sm') {
+  const uni = (targetUniStr || '').trim();
+  if (!uni) {
+    return (
+      <span className="inline-flex items-center gap-1.5 bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 px-3 py-1 rounded-full text-xs font-extrabold border border-slate-200 dark:border-white/10">
+        <GraduationCap className="w-3.5 h-3.5 text-amber-500" />
+        <span>Target University Not Specified</span>
+      </span>
+    );
+  }
+
+  const lower = uni.toLowerCase();
+  let instId: string | null = null;
+  if (lower.includes('nust')) instId = 'nust';
+  else if (lower.includes('fast')) instId = 'fast';
+  else if (lower.includes('giki')) instId = 'giki';
+  else if (lower.includes('uhs') || lower.includes('pmdc') || lower.includes('mdcat')) instId = 'uhs';
+  else if (lower.includes('lums')) instId = 'lums';
+  else if (lower.includes('uet') || lower.includes('tcat')) instId = 'uet';
+  else if (lower.includes('nums')) instId = 'nums';
+  else if (lower.includes('szabmu')) instId = 'szabmu';
+  else if (lower.includes('ned')) instId = 'ned';
+  else if (lower.includes('iba')) instId = 'iba';
+  else if (lower.includes('duhs') || lower.includes('dow')) instId = 'duhs';
+  else if (lower.includes('kmu') || lower.includes('khyber')) instId = 'kmu';
+
+  if (instId && INSTITUTIONS[instId]) {
+    return <InstitutionBadge id={instId} size={size} showFullName />;
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1.5 bg-slate-900 text-white dark:bg-white/10 dark:text-amber-300 px-3.5 py-1 rounded-full text-xs font-extrabold border border-amber-500/30 shadow-xs">
+      <GraduationCap className="w-3.5 h-3.5 text-amber-400" />
+      <span>{uni}</span>
+    </span>
+  );
+}

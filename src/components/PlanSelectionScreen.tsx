@@ -333,7 +333,7 @@ export const PlanSelectionScreen: React.FC<PlanSelectionScreenProps> = ({
                   {/* INSTITUTION BADGES */}
                   {plan.instBadges && plan.instBadges.length > 0 && (
                     <div className="space-y-1.5">
-                      <span className="text-[10px] uppercase font-bold text-slate-400">Target Institutions</span>
+                      <span className="text-[10px] uppercase font-bold text-slate-400">Target Universities</span>
                       <div className="flex flex-wrap gap-1.5">
                         {plan.instBadges.map((instId) => (
                           <InstitutionBadge key={instId} id={instId} size="sm" />

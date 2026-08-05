@@ -21,7 +21,7 @@ import {
 import { User, StudentProfile, fetchStudentWeaknessProfile, StudentWeaknessProfileData } from '../lib/supabase';
 import { HistoryItem } from '../types';
 import { PastPapersSection } from './PastPapersSection';
-import { InstitutionBadge } from './InstitutionBadge';
+import { InstitutionBadge, renderTargetUniversityBadge } from './InstitutionBadge';
 import { triggerHaptic, HAPTIC_PATTERNS } from '../lib/haptics';
 
 /**
@@ -394,45 +394,45 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           </div>
         </div>
 
-        {/* Primary Action Buttons */}
+        {/* Primary Action Buttons - Personalized to student's registered track */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 relative z-10 pt-1">
-          <button
-            type="button"
-            onClick={() => {
-              triggerHaptic(HAPTIC_PATTERNS.medium);
-              onStartPracticeTest();
-            }}
-            className="flex-1 bg-[#F2B90C] hover:bg-[#E0A800] text-[#0A0A0A] font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
-          >
-            <Zap className="w-4 h-4 text-[#0A0A0A] fill-[#0A0A0A]" />
-            <span>FBISE Practice Test</span>
-          </button>
-
-          {onSelectTcat && (
+          {userProfile?.grade?.toUpperCase().includes('MDCAT') ? (
             <button
               type="button"
               onClick={() => {
                 triggerHaptic(HAPTIC_PATTERNS.medium);
-                onSelectTcat();
-              }}
-              className="flex-1 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer border border-cyan-400/30"
-            >
-              <Target className="w-4 h-4 text-cyan-200" />
-              <span>TCAT Entry Portal</span>
-            </button>
-          )}
-
-          {onSelectMdcat && (
-            <button
-              type="button"
-              onClick={() => {
-                triggerHaptic(HAPTIC_PATTERNS.medium);
-                onSelectMdcat();
+                if (onSelectMdcat) onSelectMdcat(); else onStartPracticeTest();
               }}
               className="flex-1 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer border border-rose-400/30"
             >
               <Sparkles className="w-4 h-4 text-white fill-white/20" />
-              <span>MDCAT Entry Portal</span>
+              <span>MDCAT Entry Test Portal</span>
+            </button>
+          ) : userProfile?.grade?.toUpperCase().includes('TCAT') ? (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(HAPTIC_PATTERNS.medium);
+                if (onSelectTcat) onSelectTcat(); else onStartPracticeTest();
+              }}
+              className="flex-1 bg-gradient-to-r from-cyan-600 to-sky-600 hover:from-cyan-500 hover:to-sky-500 text-white font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer border border-cyan-400/30"
+            >
+              <Target className="w-4 h-4 text-cyan-200" />
+              <span>UET Taxila TCAT Entry Portal</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                triggerHaptic(HAPTIC_PATTERNS.medium);
+                onStartPracticeTest();
+              }}
+              className="flex-1 bg-[#F2B90C] hover:bg-[#E0A800] text-[#0A0A0A] font-extrabold py-3.5 px-5 rounded-2xl transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 text-xs sm:text-sm cursor-pointer"
+            >
+              <Zap className="w-4 h-4 text-[#0A0A0A] fill-[#0A0A0A]" />
+              <span>
+                {userProfile?.grade || 'Class 11'} {userProfile?.stream || 'Pre-Engineering'} Practice Test
+              </span>
             </button>
           )}
 
@@ -449,14 +449,12 @@ export const StudentHomeDashboard: React.FC<StudentHomeDashboardProps> = React.m
           </button>
         </div>
 
-        {/* Target Institutions & Partners Band (featuring official NUST logo) */}
+        {/* Target University Band - Displays only student's selected dream university */}
         <div className="pt-3 border-t border-slate-200 dark:border-white/10 flex flex-wrap items-center gap-2 text-xs relative z-10">
-          <span className="font-bold text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider">Target Universities & Entry Tests:</span>
-          <InstitutionBadge id="nust" size="sm" showFullName />
-          <InstitutionBadge id="fast" size="sm" />
-          <InstitutionBadge id="giki" size="sm" />
-          <InstitutionBadge id="uhs" size="sm" />
-          <InstitutionBadge id="lums" size="sm" />
+          <span className="font-bold text-slate-500 dark:text-slate-400 text-[11px] uppercase tracking-wider">
+            Target University:
+          </span>
+          {renderTargetUniversityBadge(userProfile?.dream_university || userProfile?.target_university)}
         </div>
       </div>
 
