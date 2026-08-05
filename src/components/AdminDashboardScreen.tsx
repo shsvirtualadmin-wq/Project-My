@@ -259,18 +259,31 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
     'ECAT / TCAT',
   ];
 
+const getPlanDefaultDisplayName = (planKey: string): string => {
+  if (planKey === 'free') return 'Free Plan';
+  if (planKey === 'matric') return '⭐ Matric Pro';
+  if (planKey === 'fsc') return '⭐ FSc Pro';
+  if (planKey === 'tcat') return '⭐ TCAT Pro';
+  if (planKey === 'mdcat') return '⭐ MDCAT Pro';
+  return `⭐ ${planKey.toUpperCase()} Pro`;
+};
+
   const handleOpenPlanModal = (student: StudentProfile) => {
     setSelectedStudentForPlan(student);
     const existingPlans = student.subscribed_plans && student.subscribed_plans.length > 0 ? student.subscribed_plans : ['free'];
+    const activePlan = existingPlans[0] || 'free';
     // Default to single active plan selection
-    setSelectedPlansForChange([existingPlans[0] || 'free']);
+    setSelectedPlansForChange([activePlan]);
 
     const existingClasses = student.assigned_classes && student.assigned_classes.length > 0
       ? student.assigned_classes
       : (student.grade ? [`${student.grade}${student.stream ? ' ' + student.stream : ''}`.trim()] : ['FBISE 11 Pre-Engineering']);
     setSelectedAssignedClassesForChange(existingClasses);
 
-    setCustomPackageName(student.package_name || '');
+    const initialPkgName = (student.package_name && student.package_name.trim())
+      ? student.package_name
+      : getPlanDefaultDisplayName(activePlan);
+    setCustomPackageName(initialPkgName);
     setIsProForChange(Boolean(student.is_pro || student.payment_status === 'Verified & Paid'));
 
     // Parse stored access_expires date to extract remaining/saved access period
@@ -310,6 +323,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
     } else {
       setIsProForChange(true);
     }
+    setCustomPackageName(getPlanDefaultDisplayName(planKey));
   };
 
   const handleSaveStudentPlan = async () => {
@@ -320,12 +334,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
     let pkgName = customPackageName.trim();
     if (!pkgName) {
       const p = selectedPlansForChange[0] || 'free';
-      if (p === 'free') pkgName = 'Free Plan';
-      else if (p === 'matric') pkgName = 'Matric Plan (Rs. 499/mo)';
-      else if (p === 'fsc') pkgName = 'FSc Plan (Rs. 999/mo)';
-      else if (p === 'tcat') pkgName = 'TCAT Engineering Plan (Rs. 1,499/mo)';
-      else if (p === 'mdcat') pkgName = 'MDCAT Medical Plan (Rs. 1,499/mo)';
-      else pkgName = `${p.toUpperCase()} Plan`;
+      pkgName = getPlanDefaultDisplayName(p);
     }
 
     const isFree = selectedPlansForChange.includes('free') && selectedPlansForChange.length === 1 && !isProForChange;

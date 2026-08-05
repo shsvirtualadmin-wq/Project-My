@@ -328,7 +328,7 @@ export function normalizeStudentProfileFromRow(data: any, fallbackUserId?: strin
       sign_up_method: 'Google',
       status: 'active',
       is_registered: false,
-      package_name: 'FBISE Annual Practice Pass',
+      package_name: 'Free Plan',
       subscribed_plans: ['free'],
       assigned_classes: [],
       is_pro: false,
@@ -399,15 +399,15 @@ export function normalizeStudentProfileFromRow(data: any, fallbackUserId?: strin
 
   let defaultPkgName = 'Free Plan';
   if (subscribedPlans.includes('mdcat') || pkgNameLower.includes('mdcat')) {
-    defaultPkgName = 'MDCAT Medical Plan (Rs. 1,499/mo)';
+    defaultPkgName = '⭐ MDCAT Pro';
   } else if (subscribedPlans.includes('tcat') || pkgNameLower.includes('tcat') || pkgNameLower.includes('uet')) {
-    defaultPkgName = 'TCAT Engineering Plan (Rs. 1,499/mo)';
+    defaultPkgName = '⭐ TCAT Pro';
   } else if (subscribedPlans.includes('fsc') || pkgNameLower.includes('fsc')) {
-    defaultPkgName = 'FSc Plan (Rs. 999/mo)';
+    defaultPkgName = '⭐ FSc Pro';
   } else if (subscribedPlans.includes('matric') || pkgNameLower.includes('matric')) {
-    defaultPkgName = 'Matric Plan (Rs. 499/mo)';
+    defaultPkgName = '⭐ Matric Pro';
   } else if (isPro) {
-    defaultPkgName = 'Boardly Pro Pass';
+    defaultPkgName = '⭐ Boardly Pro Pass';
   }
 
   const finalPackageName = pkgName || defaultPkgName;
@@ -1085,7 +1085,7 @@ export async function saveStudentRegistration(
     sign_up_method: 'Google',
     status: requiresPayment ? 'pending admin approval' : 'active',
     is_registered: true,
-    package_name: data.grade === 'MDCAT' ? 'MDCAT Entrance Test Pass' : data.grade === 'TCAT' ? 'TCAT Entrance Test Pass' : 'FBISE Annual Practice Pass',
+    package_name: data.grade === 'MDCAT' ? '⭐ MDCAT Pro' : data.grade === 'TCAT' ? '⭐ TCAT Pro' : 'Free Plan',
     enrollment_date: enrollmentDateStr,
     payment_status: data.payment_status || (isAdmin || isExistingStudent ? 'Verified & Paid' : 'Unpaid'),
     requires_payment: requiresPayment,

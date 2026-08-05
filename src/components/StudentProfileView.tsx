@@ -379,7 +379,7 @@ export const StudentProfileView: React.FC<StudentProfileViewProps> = ({
           <div className="p-3.5 bg-slate-50 dark:bg-[#202020] flex justify-between items-center">
             <span className="font-bold text-slate-500">Purchased Package</span>
             <span className="font-extrabold text-[#0A0A0A] dark:text-white">
-              {profile.package_name || 'FBISE Annual Practice Pass'}
+              {profile.package_name || 'Free Plan'}
             </span>
           </div>
 
