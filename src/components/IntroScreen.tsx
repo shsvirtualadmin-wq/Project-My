@@ -56,41 +56,70 @@ interface IntroScreenProps {
 }
 
 // ---------------------------------------------------------------------------
-// Animation Helper Components
+// High-Performance Shared Observer & Scroll Animation Helpers
 // ---------------------------------------------------------------------------
+
+let globalScrollObserver: IntersectionObserver | null = null;
+
+function getGlobalScrollObserver(): IntersectionObserver | null {
+  if (typeof window === 'undefined') return null;
+  if (!globalScrollObserver && 'IntersectionObserver' in window) {
+    globalScrollObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            const target = entry.target as HTMLElement;
+            target.classList.add('is-visible');
+            globalScrollObserver?.unobserve(target);
+          }
+        });
+      },
+      { threshold: 0.05, rootMargin: '50px 0px' }
+    );
+  }
+  return globalScrollObserver;
+}
 
 const ScrollFadeInCard: React.FC<{
   children: React.ReactNode;
   delayIndex?: number;
   className?: string;
 }> = ({ children, delayIndex = 0, className = '' }) => {
-  const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      },
-      { threshold: 0.1 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = getGlobalScrollObserver();
+    if (observer) {
+      observer.observe(el);
+    } else {
+      el.classList.add('is-visible');
+    }
+
+    // Safety fallback: ensure element is never permanently invisible
+    const timer = setTimeout(() => {
+      if (el && !el.classList.contains('is-visible')) {
+        el.classList.add('is-visible');
+      }
+    }, 1200);
+
+    return () => {
+      clearTimeout(timer);
+      if (observer && el) {
+        observer.unobserve(el);
+      }
+    };
   }, []);
 
   return (
     <div
       ref={ref}
       style={{
-        transitionDelay: `${delayIndex * 80}ms`,
-        transitionDuration: '500ms',
-        transitionTimingFunction: 'cubic-bezier(0.16, 1, 0.3, 1)',
+        transitionDelay: `${Math.min(delayIndex * 50, 250)}ms`,
       }}
-      className={`transition-all transform ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5'
-      } ${className}`}
+      className={`scroll-anim-card ${className}`}
     >
       {children}
     </div>
@@ -103,21 +132,26 @@ const AnimatedStatCard: React.FC<{
   label: string;
 }> = ({ targetValue, formatFn, label }) => {
   const [currentVal, setCurrentVal] = useState(0);
-  const [hasAnimated, setHasAnimated] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const hasAnimatedRef = useRef(false);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
+    const el = ref.current;
+    if (!el) return;
+
+    const localObs = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting && !hasAnimated) {
-          setHasAnimated(true);
-          const duration = 1200;
+        if (entry.isIntersecting && !hasAnimatedRef.current) {
+          hasAnimatedRef.current = true;
+          localObs.disconnect();
+
+          const duration = 1000;
           const startTime = performance.now();
 
           const animate = (now: number) => {
             const elapsed = now - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            const eased = 1 - (1 - progress) * (1 - progress);
+            const eased = 1 - Math.pow(1 - progress, 3);
             setCurrentVal(Math.floor(eased * targetValue));
 
             if (progress < 1) {
@@ -129,12 +163,24 @@ const AnimatedStatCard: React.FC<{
           requestAnimationFrame(animate);
         }
       },
-      { threshold: 0.3 }
+      { threshold: 0.1 }
     );
 
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [targetValue, hasAnimated]);
+    localObs.observe(el);
+
+    const safetyTimer = setTimeout(() => {
+      if (!hasAnimatedRef.current) {
+        hasAnimatedRef.current = true;
+        setCurrentVal(targetValue);
+        localObs.disconnect();
+      }
+    }, 1500);
+
+    return () => {
+      clearTimeout(safetyTimer);
+      localObs.disconnect();
+    };
+  }, [targetValue]);
 
   return (
     <div
@@ -157,32 +203,40 @@ const AnimatedTableRow: React.FC<{
   children: React.ReactNode;
   delayIndex: number;
 }> = ({ children, delayIndex }) => {
-  const [isVisible, setIsVisible] = useState(false);
   const ref = useRef<HTMLTableRowElement>(null);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      },
-      { threshold: 0.15 }
-    );
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
+    const el = ref.current;
+    if (!el) return;
+
+    const observer = getGlobalScrollObserver();
+    if (observer) {
+      observer.observe(el);
+    } else {
+      el.classList.add('is-visible');
+    }
+
+    const timer = setTimeout(() => {
+      if (el && !el.classList.contains('is-visible')) {
+        el.classList.add('is-visible');
+      }
+    }, 1200);
+
+    return () => {
+      clearTimeout(timer);
+      if (observer && el) {
+        observer.unobserve(el);
+      }
+    };
   }, []);
 
   return (
     <tr
       ref={ref}
       style={{
-        transitionDelay: `${delayIndex * 100}ms`,
-        transitionDuration: '500ms',
+        transitionDelay: `${Math.min(delayIndex * 60, 250)}ms`,
       }}
-      className={`hover:bg-slate-50 dark:hover:bg-white/[0.02] transition-all transform ${
-        isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
-      }`}
+      className="scroll-anim-row hover:bg-slate-50 dark:hover:bg-white/[0.02]"
     >
       {children}
     </tr>
@@ -190,43 +244,9 @@ const AnimatedTableRow: React.FC<{
 };
 
 const TypewriterChatPreview: React.FC<{ fullText: string }> = ({ fullText }) => {
-  const [displayedText, setDisplayedText] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !hasStarted) {
-          setHasStarted(true);
-          setIsTyping(true);
-          let currentLen = 0;
-          const interval = setInterval(() => {
-            currentLen += 2;
-            if (currentLen >= fullText.length) {
-              setDisplayedText(fullText);
-              setIsTyping(false);
-              clearInterval(interval);
-            } else {
-              setDisplayedText(fullText.slice(0, currentLen));
-            }
-          }, 20);
-        }
-      },
-      { threshold: 0.3 }
-    );
-
-    if (ref.current) observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [fullText, hasStarted]);
-
   return (
-    <div ref={ref} className="relative">
-      <StudyBuddyFormattedMessage content={displayedText} />
-      {isTyping && (
-        <span className="inline-block w-1.5 h-3.5 bg-amber-400 ml-1 animate-pulse align-middle" />
-      )}
+    <div className="relative">
+      <StudyBuddyFormattedMessage content={fullText} />
     </div>
   );
 };
