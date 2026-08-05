@@ -2030,7 +2030,7 @@ export function App() {
         </div>
       </main>
 
-      {/* Study Buddy Chatbot (Floating button + bottom-sheet modal across all screens) */}
+      {/* Study Buddy Chatbot (Floating button + bottom-sheet modal across non-test screens, contextual in test) */}
       <StudyBuddyModal
         isOpen={showStudyBuddy}
         onClose={() => setShowStudyBuddy((prev) => !prev)}
@@ -2040,6 +2040,7 @@ export function App() {
         selectedClass={selectedClass}
         selectedGroup={selectedGroup}
         selectedSubject={selectedSubject}
+        hideFloatingButton={screen === 'test'}
       />
 
       {/* Free Plan 2-Test Limit Overlay Modal */}

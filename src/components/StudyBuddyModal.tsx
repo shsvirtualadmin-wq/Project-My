@@ -50,6 +50,7 @@ export interface StudyBuddyModalProps {
   selectedClass?: string | number;
   selectedGroup?: string;
   selectedSubject?: string;
+  hideFloatingButton?: boolean;
 }
 
 export interface TrackInfo {
@@ -199,6 +200,7 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
   selectedClass,
   selectedGroup,
   selectedSubject,
+  hideFloatingButton,
 }) => {
   const trackInfo = getTrackInfo(studentProfile, selectedClass, selectedGroup, selectedSubject);
   const studentFirstName = studentProfile?.name?.split(' ')[0] || '';
@@ -556,6 +558,7 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
 
   // FLOATING TRIGGER BUTTON (WHEN MODAL IS CLOSED)
   if (!isOpen) {
+    if (hideFloatingButton) return null;
     return (
       <button
         type="button"

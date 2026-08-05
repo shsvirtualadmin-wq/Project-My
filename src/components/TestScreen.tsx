@@ -350,7 +350,7 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
                   {currentQ.options.map((optText, optIdx) => {
                     const isSelected = currentAnswer?.selectedOption === optIdx;
                     const isCorrect = currentQ.correct === optIdx;
-                    const showInstant = config.instantFeedback && isAnswered;
+                    const showInstant = isAnswered;
 
                     let tileStyle = 'bg-white dark:bg-[#1D1D1D] border-black/10 dark:border-white/10 hover:border-[#F2B90C] hover:shadow-md';
                     let badgeStyle = 'bg-black/5 dark:bg-white/10 text-[#0A0A0A] dark:text-white';
@@ -409,8 +409,8 @@ export const TestScreen: React.FC<TestScreenProps> = React.memo(({
                 </div>
               </div>
 
-              {/* Official Answer Explanation Card if Instant Feedback is enabled and answered */}
-              {config.instantFeedback && isAnswered && (
+              {/* Official Answer Explanation Card when answered */}
+              {isAnswered && (
                 <div
                   dir={isUrduOrIslamiat ? 'rtl' : 'ltr'}
                   className="bg-[#0A0A0A] text-white border border-[#F2B90C]/40 rounded-2xl p-4 sm:p-5 text-xs sm:text-sm leading-relaxed space-y-3 shadow-md animate-ios-spring"
