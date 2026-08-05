@@ -4334,6 +4334,7 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
         studentId,
         studentEmail,
         subscribedPlans,
+        assignedClasses,
         packageName,
         paymentStatus = 'Verified & Paid',
         expirationMonths = 12,
@@ -4394,6 +4395,10 @@ Please explain step-by-step why Option ${optionLetters[mcqContext.correctOption 
 
       const planData = {
         subscribed_plans: subscribedPlans,
+        assigned_classes: Array.isArray(assignedClasses) && assignedClasses.length > 0
+          ? assignedClasses
+          : (currentStudent.assigned_classes || [currentStudent.grade ? `${currentStudent.grade} ${currentStudent.stream || ''}`.trim() : 'General Student']),
+        is_pro: !isFree,
         package_name: packageName,
         payment_status: finalPaymentStatus,
         requires_payment: finalRequiresPayment,

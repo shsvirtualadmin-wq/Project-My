@@ -479,6 +479,20 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
         }
       };
 
+      let rafPending = false;
+      const scheduleStreamUpdate = (latestText: string) => {
+        if (rafPending) return;
+        rafPending = true;
+        requestAnimationFrame(() => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === modelMessageId ? { ...m, text: latestText } : m
+            )
+          );
+          rafPending = false;
+        });
+      };
+
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -489,17 +503,13 @@ export const StudyBuddyModal: React.FC<StudyBuddyModalProps> = ({
 
         for (const line of lines) {
           processSseLine(line);
-
-          const livePreview = accumulatedText.startsWith('⚠️')
-            ? accumulatedText
-            : sanitizeStudyBuddyText(accumulatedText);
-
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === modelMessageId ? { ...m, text: livePreview } : m
-            )
-          );
         }
+
+        const livePreview = accumulatedText.startsWith('⚠️')
+          ? accumulatedText
+          : sanitizeStudyBuddyText(accumulatedText);
+
+        scheduleStreamUpdate(livePreview);
       }
 
       if (buffer.trim()) {

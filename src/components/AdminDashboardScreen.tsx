@@ -134,6 +134,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
   const [activitySearchQuery, setActivitySearchQuery] = useState<string>('');
   const [selectedStudentForPlan, setSelectedStudentForPlan] = useState<StudentProfile | null>(null);
   const [selectedPlansForChange, setSelectedPlansForChange] = useState<string[]>(['free']);
+  const [selectedAssignedClassesForChange, setSelectedAssignedClassesForChange] = useState<string[]>([]);
   const [customPackageName, setCustomPackageName] = useState<string>('');
   const [expirationMonths, setExpirationMonths] = useState<number>(12);
   const [planAdminNote, setPlanAdminNote] = useState<string>('');
@@ -244,14 +245,41 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
     }
   };
 
+  const AVAILABLE_ASSIGNABLE_CLASSES = [
+    'FBISE 9',
+    'FBISE 10',
+    'FBISE 11 Pre-Engineering',
+    'FBISE 11 Pre-Medical',
+    'FBISE 11 ICS',
+    'FBISE 12 Pre-Engineering',
+    'FBISE 12 Pre-Medical',
+    'FBISE 12 ICS',
+    'MDCAT',
+    'ECAT / TCAT',
+  ];
+
   const handleOpenPlanModal = (student: StudentProfile) => {
     setSelectedStudentForPlan(student);
     const existingPlans = student.subscribed_plans && student.subscribed_plans.length > 0 ? student.subscribed_plans : ['free'];
     setSelectedPlansForChange(existingPlans);
+    const existingClasses = student.assigned_classes && student.assigned_classes.length > 0
+      ? student.assigned_classes
+      : [student.grade ? `${student.grade}${student.stream ? ' ' + student.stream : ''}`.trim() : 'FBISE 11 Pre-Engineering'];
+    setSelectedAssignedClassesForChange(existingClasses);
     setCustomPackageName(student.package_name || '');
     setExpirationMonths(12);
     setPlanAdminNote('');
     setPlanToast(null);
+  };
+
+  const handleToggleAssignedClass = (clsName: string) => {
+    if (selectedAssignedClassesForChange.includes(clsName)) {
+      if (selectedAssignedClassesForChange.length > 1) {
+        setSelectedAssignedClassesForChange(selectedAssignedClassesForChange.filter(c => c !== clsName));
+      }
+    } else {
+      setSelectedAssignedClassesForChange([...selectedAssignedClassesForChange, clsName]);
+    }
   };
 
   const handleTogglePlanOption = (planKey: string) => {
@@ -306,6 +334,7 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
       studentId: selectedStudentForPlan.id,
       studentEmail: selectedStudentForPlan.email,
       subscribedPlans: selectedPlansForChange,
+      assignedClasses: selectedAssignedClassesForChange,
       packageName: pkgName,
       expirationMonths,
       adminNote: planAdminNote,
@@ -313,12 +342,14 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
     });
 
     try {
+      const isFree = selectedPlansForChange.includes('free') && selectedPlansForChange.length === 1;
       const res = await updateStudentPlanInSupabase({
         studentId: selectedStudentForPlan.id,
         studentEmail: selectedStudentForPlan.email,
         subscribedPlans: selectedPlansForChange,
+        assignedClasses: selectedAssignedClassesForChange,
         packageName: pkgName,
-        paymentStatus: selectedPlansForChange.includes('free') && selectedPlansForChange.length === 1 ? 'Free Plan' : 'Verified & Paid',
+        paymentStatus: isFree ? 'Free Plan' : 'Verified & Paid',
         expirationMonths,
         adminNote: planAdminNote,
         adminEmail: detectedEmail,
@@ -331,9 +362,11 @@ export const AdminDashboardScreen: React.FC<AdminDashboardScreenProps> = React.m
               ? {
                   ...s,
                   subscribed_plans: selectedPlansForChange,
+                  assigned_classes: selectedAssignedClassesForChange,
+                  is_pro: !isFree,
                   package_name: pkgName,
-                  payment_status: selectedPlansForChange.includes('free') && selectedPlansForChange.length === 1 ? 'Free Plan' : 'Verified & Paid',
-                  requires_payment: selectedPlansForChange.includes('free') && selectedPlansForChange.length === 1,
+                  payment_status: isFree ? 'Free Plan' : 'Verified & Paid',
+                  requires_payment: isFree,
                   status: 'active',
                 }
               : s
@@ -3293,6 +3326,40 @@ CREATE POLICY "Admin full access study_buddy_history" ON public.study_buddy_hist
                     <div className="w-4 h-4 rounded-full border border-slate-300 dark:border-white/20 shrink-0" />
                   )}
                 </button>
+              </div>
+            </div>
+
+            {/* Assigned Class & Test Series Synchronization */}
+            <div className="space-y-2 pt-2 border-t border-slate-100 dark:border-white/10">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-extrabold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Assigned Classes & Test Series:</span>
+                </label>
+                <span className="text-[10px] font-extrabold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-200 dark:border-blue-500/20">
+                  {selectedAssignedClassesForChange.length} Selected
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-200 dark:border-white/10">
+                {AVAILABLE_ASSIGNABLE_CLASSES.map((cls) => {
+                  const isSelected = selectedAssignedClassesForChange.includes(cls);
+                  return (
+                    <button
+                      key={cls}
+                      type="button"
+                      onClick={() => handleToggleAssignedClass(cls)}
+                      className={`p-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer flex items-center justify-between gap-1 ${
+                        isSelected
+                          ? 'bg-blue-600 text-white shadow-sm'
+                          : 'bg-white dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-white/10 hover:border-blue-400'
+                      }`}
+                    >
+                      <span className="truncate">{cls}</span>
+                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+                  );
+                })}
               </div>
             </div>
 

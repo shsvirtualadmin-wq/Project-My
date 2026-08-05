@@ -270,6 +270,8 @@ export interface StudentProfile {
   is_registered?: boolean;
   package_name?: string;
   subscribed_plans?: string[];
+  assigned_classes?: string[];
+  is_pro?: boolean;
   target_exam?: 'FBISE' | 'MDCAT' | 'TCAT';
   enrollment_date?: string;
   payment_status?: string; // 'Verified & Paid' | 'Pending Verification' | 'Unpaid' | 'Rejected'
@@ -1207,6 +1209,34 @@ export async function fetchStudentProfileFromSupabase(
 
           const paymentStatus = data.payment_status || (isAdmin || isExistingBeforeRule ? 'Verified & Paid' : 'Pending Verification');
 
+          const subscribedPlans: string[] = Array.isArray(data.subscribed_plans)
+            ? data.subscribed_plans
+            : typeof data.subscribed_plans === 'string'
+            ? (() => { try { return JSON.parse(data.subscribed_plans); } catch { return [data.subscribed_plans]; } })()
+            : [];
+
+          let assignedClasses: string[] = [];
+          if (Array.isArray(data.assigned_classes)) {
+            assignedClasses = data.assigned_classes;
+          } else if (typeof data.assigned_classes === 'string') {
+            try {
+              assignedClasses = JSON.parse(data.assigned_classes);
+            } catch {
+              assignedClasses = [data.assigned_classes];
+            }
+          }
+
+          if (assignedClasses.length === 0 && (data.grade || data.stream)) {
+            const derived = `${data.grade || ''}${data.stream ? ' ' + data.stream : ''}`.trim();
+            if (derived) assignedClasses = [derived];
+          }
+
+          const isPro = isAdmin ||
+            data.is_pro === true ||
+            paymentStatus === 'Verified & Paid' ||
+            subscribedPlans.some((p: string) => ['pro', 'fsc', 'mdcat', 'tcat', 'matric', 'premium', 'boardly_pro'].includes(String(p).toLowerCase())) ||
+            (data.package_name && !data.package_name.toLowerCase().includes('free'));
+
           const profile: StudentProfile = {
             id: data.id,
             name: data.name || '',
@@ -1221,6 +1251,9 @@ export async function fetchStudentProfileFromSupabase(
             status: data.status || (requiresPayment ? 'pending admin approval' : 'active'),
             is_registered: isReg,
             package_name: data.package_name || 'FBISE Annual Practice Pass',
+            subscribed_plans: subscribedPlans,
+            assigned_classes: assignedClasses,
+            is_pro: isPro,
             enrollment_date: data.enrollment_date || new Date(data.created_at || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             payment_status: paymentStatus,
             requires_payment: requiresPayment,
@@ -2194,6 +2227,7 @@ export async function updateStudentPlanInSupabase(params: {
   studentId: string;
   studentEmail: string;
   subscribedPlans: string[];
+  assignedClasses?: string[];
   packageName: string;
   paymentStatus?: string;
   expirationMonths?: number;
